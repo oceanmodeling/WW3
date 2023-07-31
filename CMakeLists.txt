@@ -26,6 +26,7 @@ set(UFS_CAP "" CACHE STRING "Valid options are ${valid_caps}")
 set(NETCDF ON CACHE BOOL "Build NetCDF programs (requires NetCDF)")
 set(ENDIAN "BIG" CACHE STRING "Endianness of unformatted output files. Valid values are 'BIG', 'LITTLE', 'NATIVE'.") 
 set(EXCLUDE_FIND "" CACHE STRING "Don't try and search for these libraries (assumd to be handled by the compiler/wrapper)")
+set(BUILD_TOOLS OFF CACHE BOOL "Build WW3 tools")
 
 # make sure all "exclude_find" entries are lower case
 list(TRANSFORM EXCLUDE_FIND TOLOWER)
