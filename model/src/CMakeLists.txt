@@ -141,7 +141,9 @@ if(UFS_CAP)
   target_sources(ww3_lib PRIVATE ${cap_src})
   target_link_libraries(ww3_lib PUBLIC esmf)
   # Don't build executables when building WW3 ESMF library
-  set(programs "")
+  if (NOT BUILD_TOOLS)
+    set(programs "")
+  endif()
 endif()
 
 set_property(SOURCE w3initmd.F90
