@@ -484,6 +484,7 @@ contains
     ! local variables
     integer                             :: i,j,n
     type(ESMF_Field)                    :: lfield
+    type(ESMF_FieldStatus_Flag)         :: status
     integer                             :: fieldCount
     integer                             :: lrank
     character(ESMF_MAXSTR), allocatable :: lfieldnamelist(:)
@@ -504,6 +505,11 @@ contains
     do n = 1, fieldCount
       call ESMF_StateGet(State, itemName=trim(lfieldnamelist(n)), field=lfield, rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call ESMF_FieldGet(lfield, status=status, rc=rc)
+      if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      if (status /= ESMF_FIELDSTATUS_COMPLETE) return
 
       call field_getfldptr(lfield, fldptr1=fldptr1, fldptr2=fldptr2, rank=lrank, rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
