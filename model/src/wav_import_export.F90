@@ -145,6 +145,9 @@ contains
       call fldlist_add(fldsFrWav_num, fldsFrWav, 'Sw_vstokes')
     else
       call fldlist_add(fldsFrWav_num, fldsFrWav, 'Sw_z0')
+      call fldlist_add(fldsFrWav_num, fldsFrWav, 'Sw_wavsuu')
+      call fldlist_add(fldsFrWav_num, fldsFrWav, 'Sw_wavsuv')
+      call fldlist_add(fldsFrWav_num, fldsFrWav, 'Sw_wavsvv')
     end if
     call fldlist_add(fldsFrWav_num, fldsFrWav, 'Sw_pstokes_x', ungridded_lbound=1, ungridded_ubound=3)
     call fldlist_add(fldsFrWav_num, fldsFrWav, 'Sw_pstokes_y', ungridded_lbound=1, ungridded_ubound=3)
@@ -753,14 +756,14 @@ contains
       call CalcBotcur( va, wbcuru, wbcurv, wbcurp)
     end if
 
-    if ( state_fldchk(exportState, 'wavsuu') .and. &
-         state_fldchk(exportState, 'wavsuv') .and. &
-         state_fldchk(exportState, 'wavsvv')) then
-      call state_getfldptr(exportState, 'sxxn', sxxn, rc=rc)
+    if ( state_fldchk(exportState, 'Sw_wavsuu') .and. &
+         state_fldchk(exportState, 'Sw_wavsuv') .and. &
+         state_fldchk(exportState, 'Sw_wavsvv')) then
+      call state_getfldptr(exportState, 'Sw_wavsuu', sxxn, rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-      call state_getfldptr(exportState, 'sxyn', sxyn, rc=rc)
+      call state_getfldptr(exportState, 'Sw_wavsuv', sxyn, rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-      call state_getfldptr(exportState, 'syyn', syyn, rc=rc)
+      call state_getfldptr(exportState, 'Sw_wavsvv', syyn, rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
       call CalcRadstr2D( va, sxxn, sxyn, syyn)
     end if
