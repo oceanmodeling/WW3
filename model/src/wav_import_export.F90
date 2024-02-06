@@ -289,6 +289,7 @@ contains
     type(ESMF_State)        :: importState
     type(ESMF_VM)           :: vm
     type(ESMF_Clock)        :: clock
+    type(ESMF_Time)         :: curr_time
     real(r4)                :: global_data(nsea)
     real(r4), allocatable   :: global_data2(:)
     real(r4)                :: def_value
@@ -299,6 +300,7 @@ contains
     real(r4), allocatable   :: wxdata(:)      ! only needed if merge_import
     real(r4), allocatable   :: wydata(:)      ! only needed if merge_import
     character(len=CL)       :: msgString
+    character(len=CL)       :: timeStr
     character(len=*), parameter :: subname='(wav_import_export:import_fields)'
     !---------------------------------------------------------------------------
 
@@ -319,6 +321,21 @@ contains
 
     if (dbug_flag > 5) then
       call state_diagnose(importState, 'at import ', rc=rc)
+      if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
+
+    ! Debug output
+    if (dbug_flag > 10) then
+      ! Get current time
+      call ESMF_ClockGet(clock, currTime=curr_time, rc=rc)
+      if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      ! Get time as string
+      call ESMF_TimeGet(curr_time, timeStringISOFrac=timeStr , rc=rc)
+      if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      ! Write fields in state object to VTK file
+      call state_write_vtk(importState, 'import_'//trim(timeStr), rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
@@ -1675,4 +1692,61 @@ contains
     if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
 
   end subroutine readfromfile
+
+  !========================================================================
+  !> Write fields in state object to VTK files
+  !!
+  !> @details Get list of fields in state object and write them to VTK file
+  !!
+  !! @param[in]  state                  state object
+  !! @param[in]  prefix                 a string used to construct file name
+  !! @param[out] rc                     a return code
+  !!
+  !> @author U. Turuncoglu, NCAR
+  !> @date 27-Dec-2023
+  subroutine state_write_vtk(state, prefix, rc)
+
+    ! input/output variables
+    type(ESMF_State) , intent(in)  :: state
+    character(len=*) , intent(in)  :: prefix
+    integer, optional, intent(out) :: rc
+
+    ! local variables
+    integer                             :: i, itemCount
+    type(ESMF_Field)                    :: field
+    character(ESMF_MAXSTR), allocatable :: itemNameList(:)
+    character(len=*), parameter :: subname = '(wav_import_export:state_write_vtk)'
+    !---------------------------------------------------------------------------
+
+    rc = ESMF_SUCCESS
+    if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
+
+    ! get number of fields in the state
+    call ESMF_StateGet(state, itemCount=itemCount, rc=rc)
+    if (chkerr(rc,__LINE__,u_FILE_u)) return
+
+    ! get item names
+    if (.not. allocated(itemNameList)) allocate(itemNameList(itemCount))
+
+    call ESMF_StateGet(state, itemNameList=itemNameList, rc=rc)
+    if (chkerr(rc,__LINE__,u_FILE_u)) return
+
+    ! loop over fields and write them
+    do i = 1, itemCount
+       ! get field
+       call ESMF_StateGet(state, itemName=trim(itemNameList(i)), field=field, rc=rc)
+       if (chkerr(rc,__LINE__,u_FILE_u)) return
+
+       ! write it
+       call ESMF_FieldWriteVTK(field, trim(prefix)//'_'//trim(itemNameList(i)), rc=rc)
+       if (chkerr(rc,__LINE__,u_FILE_u)) return
+    end do
+
+    ! clean temporary variables
+    if (allocated(itemNameList)) deallocate(itemNameList)
+
+    if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
+
+  end subroutine state_write_vtk
+
 end module wav_import_export
