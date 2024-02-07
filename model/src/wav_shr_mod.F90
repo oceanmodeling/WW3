@@ -14,7 +14,7 @@ module wav_shr_mod
   use ESMF            , only : ESMF_LOGERR_PASSTHRU, ESMF_LogFoundError, ESMF_LOGMSG_ERROR, ESMF_MAXSTR
   use ESMF            , only : ESMF_SUCCESS, ESMF_LogWrite, ESMF_LOGMSG_INFO, ESMF_FAILURE
   use ESMF            , only : ESMF_State, ESMF_StateGet, ESMF_StateItem_Flag, ESMF_STATEITEM_NOTFOUND
-  use ESMF            , only : ESMF_Field, ESMF_FieldGet
+  use ESMF            , only : ESMF_Field, ESMF_FieldGet, ESMF_FieldWriteVTK
   use ESMF            , only : ESMF_GridComp, ESMF_GridCompGet, ESMF_GridCompSet
   use ESMF            , only : ESMF_GeomType_Flag, ESMF_FieldStatus_Flag
   use ESMF            , only : ESMF_Mesh, ESMF_MeshGet
@@ -47,6 +47,7 @@ module wav_shr_mod
   private :: field_getfldptr   !< @private obtain a pointer to a field
   public  :: diagnose_mesh     !< @public write out info about mesh
   public  :: write_meshdecomp  !< @public write the mesh decomposition to a file
+  public  :: state_write_vtk   !< @public write fields in state to disk in VTK format 
 
   interface state_getfldptr
     module procedure state_getfldptr_1d
@@ -1373,5 +1374,64 @@ contains
       chkerr = .true.
     endif
   end function chkerr
+
+  !========================================================================
+  !> Write fields in state object to VTK files
+  !!
+  !> @details Get list of fields in state object and write them to VTK file
+  !!
+  !! @param[in]  state                  state object
+  !! @param[in]  prefix                 a string used to construct file name
+  !! @param[out] rc                     a return code
+  !!
+  !> @author U. Turuncoglu, NCAR
+  !> @date 27-Dec-2023
+  subroutine state_write_vtk(state, prefix, rc)
+
+    ! input/output variables
+    type(ESMF_State) , intent(in)  :: state
+    character(len=*) , intent(in)  :: prefix
+    integer, optional, intent(out) :: rc
+
+    ! local variables
+    integer                             :: i, itemCount
+    type(ESMF_Field)                    :: field
+    character(ESMF_MAXSTR), allocatable :: itemNameList(:)
+    character(len=*), parameter :: subname = '(wav_shr_mod:state_write_vtk)'
+    !---------------------------------------------------------------------------
+
+    rc = ESMF_SUCCESS
+    if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
+
+    call state_diagnose(state, 'inside state_write_vtk ', rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    ! get number of fields in the state
+    call ESMF_StateGet(state, itemCount=itemCount, rc=rc)
+    if (chkerr(rc,__LINE__,u_FILE_u)) return
+
+    ! get item names
+    if (.not. allocated(itemNameList)) allocate(itemNameList(itemCount))
+
+    call ESMF_StateGet(state, itemNameList=itemNameList, rc=rc)
+    if (chkerr(rc,__LINE__,u_FILE_u)) return
+
+    ! loop over fields and write them
+    do i = 1, itemCount
+       ! get field
+       call ESMF_StateGet(state, itemName=trim(itemNameList(i)), field=field, rc=rc)
+       if (chkerr(rc,__LINE__,u_FILE_u)) return
+
+       ! write it
+       call ESMF_FieldWriteVTK(field, trim(prefix)//'_'//trim(itemNameList(i)), rc=rc)
+       if (chkerr(rc,__LINE__,u_FILE_u)) return
+    end do
+
+    ! clean temporary variables
+    if (allocated(itemNameList)) deallocate(itemNameList)
+
+    if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
+
+  end subroutine state_write_vtk
 
 end module wav_shr_mod

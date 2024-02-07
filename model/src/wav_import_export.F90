@@ -18,7 +18,7 @@ module wav_import_export
   use wav_kind_mod , only : CL => shr_kind_cl, CS => shr_kind_cs
   use wav_shr_mod  , only : ymd2date
   use wav_shr_mod  , only : chkerr
-  use wav_shr_mod  , only : state_diagnose, state_reset, state_getfldptr, state_fldchk
+  use wav_shr_mod  , only : state_diagnose, state_reset, state_getfldptr, state_fldchk, state_write_vtk
   use wav_shr_mod  , only : wav_coupling_to_cice, nwav_elev_spectrum, merge_import, dbug_flag, multigrid, unstr_mesh
   use constants    , only : grav, tpi, dwat
   use w3parall     , only : init_get_isea
@@ -1692,61 +1692,4 @@ contains
     if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
 
   end subroutine readfromfile
-
-  !========================================================================
-  !> Write fields in state object to VTK files
-  !!
-  !> @details Get list of fields in state object and write them to VTK file
-  !!
-  !! @param[in]  state                  state object
-  !! @param[in]  prefix                 a string used to construct file name
-  !! @param[out] rc                     a return code
-  !!
-  !> @author U. Turuncoglu, NCAR
-  !> @date 27-Dec-2023
-  subroutine state_write_vtk(state, prefix, rc)
-
-    ! input/output variables
-    type(ESMF_State) , intent(in)  :: state
-    character(len=*) , intent(in)  :: prefix
-    integer, optional, intent(out) :: rc
-
-    ! local variables
-    integer                             :: i, itemCount
-    type(ESMF_Field)                    :: field
-    character(ESMF_MAXSTR), allocatable :: itemNameList(:)
-    character(len=*), parameter :: subname = '(wav_import_export:state_write_vtk)'
-    !---------------------------------------------------------------------------
-
-    rc = ESMF_SUCCESS
-    if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
-
-    ! get number of fields in the state
-    call ESMF_StateGet(state, itemCount=itemCount, rc=rc)
-    if (chkerr(rc,__LINE__,u_FILE_u)) return
-
-    ! get item names
-    if (.not. allocated(itemNameList)) allocate(itemNameList(itemCount))
-
-    call ESMF_StateGet(state, itemNameList=itemNameList, rc=rc)
-    if (chkerr(rc,__LINE__,u_FILE_u)) return
-
-    ! loop over fields and write them
-    do i = 1, itemCount
-       ! get field
-       call ESMF_StateGet(state, itemName=trim(itemNameList(i)), field=field, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
-
-       ! write it
-       call ESMF_FieldWriteVTK(field, trim(prefix)//'_'//trim(itemNameList(i)), rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
-    end do
-
-    ! clean temporary variables
-    if (allocated(itemNameList)) deallocate(itemNameList)
-
-    if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
-
-  end subroutine state_write_vtk
-
 end module wav_import_export
