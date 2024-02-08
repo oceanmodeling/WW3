@@ -19,7 +19,8 @@ module wav_import_export
   use wav_shr_mod  , only : ymd2date
   use wav_shr_mod  , only : chkerr
   use wav_shr_mod  , only : state_diagnose, state_reset, state_getfldptr, state_fldchk, state_write_vtk
-  use wav_shr_mod  , only : wav_coupling_to_cice, nwav_elev_spectrum, merge_import, dbug_flag, multigrid, unstr_mesh
+  use wav_shr_mod  , only : wav_coupling_to_cice, nwav_elev_spectrum, merge_import, dbug_flag, multigrid
+  use wav_shr_mod  , only : standalone, unstr_mesh
   use constants    , only : grav, tpi, dwat
   use w3parall     , only : init_get_isea
 
@@ -398,12 +399,14 @@ contains
       TW0  = time0       ! times for atm wind/temp fields.
       TWN  = timen
 
-      if (merge_import) then
+      if (merge_import .or. standalone) then
         ! set mask using u-wind field if merge_import; assume all import fields
         ! will have same missing overlap region
         ! import_mask memory will be allocate in set_importmask
-        call set_importmask(importState, clock, trim(uwnd), vm, rc)
-        if (ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (merge_import) then
+           call set_importmask(importState, clock, trim(uwnd), vm, rc)
+           if (ChkErr(rc,__LINE__,u_FILE_u)) return
+        end if
         allocate(wxdata(nsea))
         allocate(wydata(nsea))
         call readfromfile('WND', wxdata, wydata, time0, timen, rc)
@@ -413,8 +416,10 @@ contains
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
           call check_globaldata(gcomp, 'wydata', wydata, nsea, rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          call check_globaldata(gcomp, 'import_mask', import_mask, nsea, rc)
-          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          if (merge_import) then
+             call check_globaldata(gcomp, 'import_mask', import_mask, nsea, rc)
+             if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          end if
         end if
       end if
 
@@ -435,6 +440,12 @@ contains
           call FillGlobalInput(global_data, WX0)
           call FillGlobalInput(global_data, WXN)
         end if
+      else
+        if (standalone) then
+           call ESMF_LogWrite(trim(subname)//' no connected uwnd field. reading data from wind.ww3.', ESMF_LOGMSG_INFO)
+           call FillGlobalInput(wxdata, WX0)
+           call FillGlobalInput(wxdata, WXN)
+        end if
       end if
 
       ! atm v wind
@@ -454,6 +465,12 @@ contains
         else
           call FillGlobalInput(global_data, WY0)
           call FillGlobalInput(global_data, WYN)
+        end if
+      else
+        if (standalone) then
+           call ESMF_LogWrite(trim(subname)//' no connected vwnd field. reading data from wind.ww3.', ESMF_LOGMSG_INFO)
+           call FillGlobalInput(wydata, WY0)
+           call FillGlobalInput(wydata, WYN)
         end if
       end if
 

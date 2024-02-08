@@ -47,7 +47,7 @@ module wav_comp_nuopc
   use w3odatmd              , only : runtype, use_user_histname, user_histfname, use_user_restname, user_restfname
   use w3odatmd              , only : user_netcdf_grdout
   use w3odatmd              , only : time_origin, calendar_name, elapsed_secs
-  use wav_shr_mod           , only : casename, multigrid, inst_suffix, inst_index, unstr_mesh
+  use wav_shr_mod           , only : casename, multigrid, inst_suffix, inst_index, unstr_mesh, standalone
   use wav_wrapper_mod       , only : ufs_settimer, ufs_logtimer, ufs_file_setlogunit, wtime
 #ifndef W3_CESMCOUPLED
   use wmwavemd              , only : wmwave
@@ -379,10 +379,22 @@ contains
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
     if (isPresent .and. isSet) runtimelog=(trim(cvalue)=="true")
     write(logmsg,*) runtimelog
-    call ESMF_LogWrite('WW3_cap:RunTimeLog = '//trim(logmsg), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite(trim(subname)//': RunTimeLog = '//trim(logmsg), ESMF_LOGMSG_INFO)
     if (runtimelog) then
       call ufs_file_setLogUnit('./log.ww3.timer',nu_timer,runtimelog)
     end if
+
+    ! Determine if this is standalone run
+    call NUOPC_CompAttributeGet(gcomp, name="standalone", value=cvalue, isPresent=isPresent, isSet=isSet, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (isPresent .and. isSet) then
+      if (trim(cvalue) == '.true.' .or. trim(cvalue) == 'true') then
+        standalone = .true.
+      end if
+    end if
+    write(logmsg,'(A,l)') trim(subname)//': Standalone setting is ', standalone
+    call ESMF_LogWrite(trim(logmsg), ESMF_LOGMSG_INFO)
+
     call advertise_fields(importState, exportState, flds_scalar_name, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
