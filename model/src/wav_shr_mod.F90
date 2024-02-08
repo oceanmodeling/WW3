@@ -75,6 +75,8 @@ module wav_shr_mod
                                                           !! be merged with a field provided from a file
   logical            , public :: multigrid = .false.      !< @public logical to control whether wave model is run
                                                           !! as multigrid
+  logical            , public :: standalone = .false.     !< @public logical to control whether wave model is run
+                                                          !! in standalone mode - read fields from file
 
   interface ymd2date
     module procedure ymd2date_int
