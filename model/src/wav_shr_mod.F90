@@ -26,6 +26,7 @@ module wav_shr_mod
   use ESMF            , only : ESMF_Time, ESMF_TimeGet, ESMF_TimeSet
   use ESMF            , only : ESMF_TimeInterval, ESMF_TimeIntervalSet, ESMF_TimeIntervalGet
   use ESMF            , only : ESMF_VM, ESMF_VMGet, ESMF_VMBroadcast, ESMF_VMGetCurrent
+  use ESMF            , only : ESMF_FieldStatus_Flag, ESMF_FIELDSTATUS_COMPLETE
   use NUOPC           , only : NUOPC_CompAttributeGet
   use NUOPC_Model     , only : NUOPC_ModelGet
   use wav_kind_mod    , only : r8 => shr_kind_r8, i8 => shr_kind_i8, cl=>shr_kind_cl, cs=>shr_kind_cs
@@ -486,6 +487,7 @@ contains
     ! local variables
     integer                             :: i,j,n
     type(ESMF_Field)                    :: lfield
+    type(ESMF_FieldStatus_Flag)         :: lstatus
     integer                             :: fieldCount
     integer                             :: lrank
     character(ESMF_MAXSTR), allocatable :: lfieldnamelist(:)
@@ -507,19 +509,24 @@ contains
       call ESMF_StateGet(State, itemName=trim(lfieldnamelist(n)), field=lfield, rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      call field_getfldptr(lfield, fldptr1=fldptr1, fldptr2=fldptr2, rank=lrank, rc=rc)
+      call ESMF_FieldGet(lfield, status=lstatus, rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      if (lrank == 0) then
-        ! no local data
-      elseif (lrank == 1) then
-        fldptr1 = reset_value
-      elseif (lrank == 2) then
-        fldptr2 = reset_value
-      else
-        call ESMF_LogWrite(trim(subname)//": ERROR in rank "//trim(lfieldnamelist(n)), ESMF_LOGMSG_ERROR)
-        rc = ESMF_FAILURE
-        return
+      if (lstatus == ESMF_FIELDSTATUS_COMPLETE) then
+        call field_getfldptr(lfield, fldptr1=fldptr1, fldptr2=fldptr2, rank=lrank, rc=rc)
+        if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+        if (lrank == 0) then
+          ! no local data
+        elseif (lrank == 1) then
+          fldptr1 = reset_value
+        elseif (lrank == 2) then
+          fldptr2 = reset_value
+        else
+          call ESMF_LogWrite(trim(subname)//": ERROR in rank "//trim(lfieldnamelist(n)), ESMF_LOGMSG_ERROR)
+          rc = ESMF_FAILURE
+          return
+        endif
       endif
     enddo
 
