@@ -223,8 +223,8 @@ contains
 
     !  6   Wave-ocean layer
     gridoutdefs(6,1:25) = [ &
-         varatts( "SXY  ", "SXX       ", "Radiation stresses xx                           ", "N m-1     ", "  ", .false.) , &
-         varatts( "SXY  ", "SYY       ", "Radiation stresses yy                           ", "N m-1     ", "  ", .false.) , &
+         varatts( "SXX  ", "SXX       ", "Radiation stresses xx                           ", "N m-1     ", "  ", .false.) , &
+         varatts( "SYY  ", "SYY       ", "Radiation stresses yy                           ", "N m-1     ", "  ", .false.) , &
          varatts( "SXY  ", "SXY       ", "Radiation stresses xy                           ", "N m-1     ", "  ", .false.) , &
          varatts( "TWO  ", "TAUOX     ", "Wave to ocean momentum flux x                   ", "m2 s-2    ", "  ", .false.) , &
          varatts( "TWO  ", "TAUOY     ", "Wave to ocean momentum flux y                   ", "m2 s-2    ", "  ", .false.) , &
