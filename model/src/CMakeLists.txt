@@ -178,6 +178,7 @@ endif()
 
 if("PIO" IN_LIST switches)
   target_sources(ww3_lib PRIVATE ${pio_src})
+  target_link_libraries(ww3_lib PUBLIC PIO::PIO_Fortran)
 endif()
 
 # Handle PDLIB, SCRIP, SCRIPNC build files directly instead of through configuration file
