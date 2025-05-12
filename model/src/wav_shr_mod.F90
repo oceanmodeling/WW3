@@ -74,12 +74,7 @@ module wav_shr_mod
 
   ! Only used by ufs
   logical            , public :: merge_import  = .false.  !< @public logical to specify whether import fields will
-                                                          !! be merged with a field provided from a file
-  logical            , public :: multigrid = .false.      !< @public logical to control whether wave model is run
-                                                          !! as multigrid
   logical            , public :: standalone = .false.     !< @public logical to control whether wave model is run
-                                                          !! in standalone mode - read fields from file
-
   interface ymd2date
     module procedure ymd2date_int
     module procedure ymd2date_long
@@ -366,7 +361,7 @@ contains
     integer,          intent(inout)  :: rc
 
     ! local variables
-    integer           :: mytask, ierr, len
+    integer           :: mytask
     type(ESMF_VM)     :: vm
     type(ESMF_Field)  :: field
     real(r8), pointer :: farrayptr(:,:)
@@ -486,7 +481,7 @@ contains
     integer          , intent(out)   :: rc
 
     ! local variables
-    integer                             :: i,j,n
+    integer                             :: n
     type(ESMF_Field)                    :: lfield
     type(ESMF_FieldStatus_Flag)         :: lstatus
     integer                             :: fieldCount
@@ -673,7 +668,7 @@ contains
     integer         , intent(out) :: rc
 
     ! local variables
-    integer                         :: i,j,n
+    integer                         :: n
     type(ESMf_Field)                :: lfield
     integer                         :: fieldCount, lrank
     character(ESMF_MAXSTR) ,pointer :: lfieldnamelist(:)
@@ -894,7 +889,7 @@ contains
     integer                     , intent(inout) :: rc        ! Return code
 
     ! local variables
-    type(ESMF_Calendar)     :: cal                ! calendar
+    type(ESMF_Calendar)     :: cal              ! calendar
     integer                 :: lymd             ! local ymd
     integer                 :: ltod             ! local tod
     integer                 :: cyy,cmm,cdd,csec ! time info
@@ -903,7 +898,6 @@ contains
     type(ESMF_Time)         :: CurrTime         ! Current Time
     type(ESMF_Time)         :: NextAlarm        ! Next restart alarm time
     type(ESMF_TimeInterval) :: AlarmInterval    ! Alarm interval
-    integer                 :: sec
 
     character(len=*), parameter :: subname = ' (wav_shr_mod:set_alarmInit) '
     !-------------------------------------------------------------------------------
