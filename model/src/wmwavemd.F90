@@ -250,6 +250,11 @@ CONTAINS
 #ifdef W3_MPRF
     USE WMMDATMD, ONLY: MDSP
 #endif
+#ifdef W3_COAWST_MODEL
+  USE CWSTWVCP
+  USE MCT_COUPLER_PARAMS
+  USE W3UPDTMD
+#endif
     !/
     IMPLICIT NONE
     !
@@ -267,7 +272,7 @@ CONTAINS
     !/
     INTEGER                 :: J, JJ, I, JO, TPRNT(2), TAUX(2),     &
          II, JJJ, IX, IY, UPNEXT(2), UPLAST(2)
-    INTEGER                 :: DUMMY2(40)=0
+    INTEGER                 :: DUMMY2(35)=0
 #ifdef W3_T
     INTEGER                 :: ILOOP
 #endif
@@ -325,6 +330,15 @@ CONTAINS
         IF ( DTTST .LT. 0. ) GOTO 2001
       END IF
     END DO
+!
+#if defined W3_AIR_WAVES || defined W3_WAVES_OCEAN
+    DO I=1, NRGRD
+      CALL W3SETG ( I, MDSE, MDST )
+      CALL INIT_WVCP (I)
+    END DO
+    CALL INITIALIZE_WAV_ROUTERS
+#endif
+!
     !
     !     Consistency of times within groups, set global TSYNC(:,0)
     !

@@ -310,10 +310,6 @@ MODULE W3ODATMD
   !
   !/ ------------------------------------------------------------------- /
   USE CONSTANTS, ONLY : UNDEF
-
-  ! module default
-  IMPLICIT NONE
-
   PUBLIC
   !/
   !/ Module private variable for checking error returns
@@ -440,7 +436,7 @@ MODULE W3ODATMD
     INTEGER               :: TOSNL5(2)
 #endif
     INTEGER               :: TOFRST(2), TONEXT(2,8), TOLAST(2,8), &
-         TBPI0(2), TBPIN(2), NDS(15), OFILES(7)
+         TBPI0(2), TBPIN(2), NDS(13), OFILES(7)
     REAL                  :: DTOUT(8)
     LOGICAL               :: FLOUT(8)
     TYPE(OTYPE1)          :: OUT1
@@ -558,36 +554,6 @@ MODULE W3ODATMD
   LOGICAL, POINTER        :: FLFORM, FLCOMB, O6INIT
   INTEGER, POINTER        :: PTMETH   ! C. Bunney; Partitioning method
   REAL, POINTER           :: PTFCUT   ! C. Bunney; Part. 5 freq cut
-
-  character(len=8)   :: runtype = ''                   !< @public the run type (startup,branch,continue)
-  character(len=256) :: initfile = ''                  !< @public name of wave initial condition file
-                                                       !! if runtype is startup or branch run, then initfile is used
-  character(len=512) :: user_histfname = ''            !< @public user history filename prefix, timestring
-                                                       !! YYYY-MM-DD-SSSSS will be appended
-  character(len=512) :: user_restfname = ''            !< @public user restart filename prefix, timestring
-                                                       !! YYYY-MM-DD-SSSSS will be appended
-  logical            :: histwr = .false.               !< @public logical to trigger history write
-                                                       !! if true => write history file (snapshot)
-  logical            :: rstwr = .false.                !< @public logical to trigger restart write
-                                                       !! if true => write restart
-  logical            :: use_historync = .false.        !< @public logical flag to use netCDF for gridded
-                                                       !! field output
-  logical            :: use_restartnc = .false.        !< @public logical flag to read and write netCDF restarts
-  logical            :: restart_from_binary = .false.  !< @public logical flag for restarting from binary restart
-                                                       ! when use_restartnc is true
-  logical            :: logfile_is_assigned = .false.  !< @public logical flag for assignment of nds(1) to specified
-                                                       !! log file in mesh cap
-  logical            :: verboselog = .true.            !< @public logical flag to enable verbose WW3 native logging
-  logical            :: addrstflds = .false.           !< @public logical flag for additional restart fields
-  integer            :: rstfldcnt = 0                  !< @public the actual number of additional restart fields
-  character(len=10), dimension(10) :: rstfldlist = ''  !< @public a list of additional fields for the restart file,
-                                                       !! currently set to a maximum of 10. Additional restart fields
-                                                       !! are required only when waves are in the slow loop and ice
-                                                       !! is present. Note that waves should not be in the slow loop
-                                                       !! if coupling to CICE is set
-  character(len=36)  :: time_origin = ''               !< @public the time_origin used for netCDF output
-  character(len=36)  :: calendar_name = ''             !< @public the calendar used for netCDF output
-  integer(kind=8)    :: elapsed_secs = 0               !< @public the time in seconds from the time_origin
   !/
 CONTAINS
   !/ ------------------------------------------------------------------- /
@@ -658,6 +624,7 @@ CONTAINS
     USE W3SERVMD, ONLY: STRACE
 #endif
     !
+    IMPLICIT NONE
     !/
     !/ ------------------------------------------------------------------- /
     !/ Parameter list
@@ -888,7 +855,7 @@ CONTAINS
     !
     ! 6) Wave-ocean layer
     !
-    NOGE(6) = 14
+    NOGE(6) = 13
     !
     IDOUT( 6, 1)  = 'Radiation stresses  '
     IDOUT( 6, 2)  = 'Wave-ocean mom. flux'
@@ -903,7 +870,6 @@ CONTAINS
     IDOUT( 6,11)  = 'Wave-ice energy flux'
     IDOUT( 6,12)  = 'Split Surface Stokes'
     IDOUT( 6,13)  = 'Tot wav-ocn mom flux'
-    IDOUT( 6,14)  = 'Stokes drift sfc ave'
     !
     ! 7) Wave-bottom layer
     !
@@ -921,14 +887,13 @@ CONTAINS
     !
     ! 8) Spectrum parameters
     !
-    NOGE(8) = 6
+    NOGE(8) = 5
     !
     IDOUT( 8, 1)  = 'Mean square slopes  '
     IDOUT( 8, 2)  = 'Phillips tail const'
     IDOUT( 8, 3)  = 'Slope direction     '
     IDOUT( 8, 4)  = 'Tail slope direction'
     IDOUT( 8, 5)  = 'Goda peakedness parm'
-    IDOUT( 8, 6)  = 'kxky-peakdness      '
     !      IDOUT( 8, 3)  = 'Lx-Ly mean wvlength'
     !      IDOUT( 8, 4)  = 'Surf grad correl XT'
     !      IDOUT( 8, 5)  = 'Surf grad correl YT'
@@ -1055,6 +1020,7 @@ CONTAINS
     USE W3SERVMD, ONLY: STRACE
 #endif
     !
+    IMPLICIT NONE
     !/
     !/ ------------------------------------------------------------------- /
     !/ Parameter list
@@ -1249,6 +1215,7 @@ CONTAINS
     USE W3SERVMD, ONLY: STRACE
 #endif
     !
+    IMPLICIT NONE
     !/
     !/ ------------------------------------------------------------------- /
     !/ Parameter list
@@ -1417,6 +1384,7 @@ CONTAINS
     USE W3SERVMD, ONLY: STRACE
 #endif
     !
+    IMPLICIT NONE
     !/
     !/ ------------------------------------------------------------------- /
     !/ Parameter list
@@ -1618,6 +1586,7 @@ CONTAINS
     USE W3SERVMD, ONLY: STRACE
 #endif
     !
+    IMPLICIT NONE
     !
     !/
     !/ ------------------------------------------------------------------- /

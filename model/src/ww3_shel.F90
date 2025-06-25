@@ -13,7 +13,11 @@
 !>
 !> @author H. L. Tolman @date 22-Mar-2021
 !
-PROGRAM W3SHEL
+#ifdef W3_COAWST_MODEL
+      SUBROUTINE WW3_init (MyCOMM)
+#else
+      PROGRAM W3SHEL
+#endif
   !/
   !/                  +-----------------------------------+
   !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -259,6 +263,9 @@ PROGRAM W3SHEL
 #ifdef W3_OASIS
   USE W3WDATMD, ONLY: TIME00, TIMEEND
 #endif
+#ifdef W3_COAWST_MODEL
+  USE W3WDATMD, ONLY: TIMEEND
+#endif
 #ifdef W3_NL5
   USE W3WDATMD, ONLY: QI5TBEG
 #endif
@@ -298,7 +305,10 @@ PROGRAM W3SHEL
 #ifdef W3_OASICM
   USE W3IGCMMD, ONLY: SND_FIELDS_TO_ICE
 #endif
-
+#ifdef W3_COAWST_MODEL
+  USE CWSTWVCP
+  USE MCT_COUPLER_PARAMS
+#endif
 #ifdef W3_TIDE
   USE W3TIDEMD
 #endif
@@ -329,7 +339,7 @@ PROGRAM W3SHEL
        NDSEN, IERR, J, I, ILOOP, IPTS, NPTS,     &
        NDTNEW, MPI_COMM = -99,                   &
        FLAGTIDE, COUPL_COMM, IH, N_TOT
-  INTEGER             :: NDSF(-7:9), NDS(15), NTRACE(2), NDT(7:9), &
+  INTEGER             :: NDSF(-7:9), NDS(13), NTRACE(2), NDT(7:9), &
        TIME0(2), TIMEN(2), TTIME(2), TTT(2),     &
        NH(-7:10), THO(2,-7:10,NHMAX), RCLD(7:9), &
        NODATA(7:9), ODAT(40), IPRT(6) = 0,       &
@@ -344,6 +354,10 @@ PROGRAM W3SHEL
   INTEGER             :: CLKDT1(8), CLKDT2(8), CLKDT3(8)
 #ifdef W3_MPI
   INTEGER             :: IERR_MPI
+#endif
+#ifdef W3_COAWST_MODEL
+  INTEGER             :: COAWSTED, ccount
+  INTEGER             :: MyCOMM
 #endif
   !
   REAL                :: FACTOR, DTTST, XX, YY,                    &
@@ -436,6 +450,9 @@ PROGRAM W3SHEL
 #ifdef W3_OASIS
   OASISED=1
 #endif
+#ifdef W3_COAWST_MODEL
+  COAWSTED=1
+#endif
 #ifdef W3_PDLIB
   LPDLIB = .TRUE.
 #endif
@@ -469,6 +486,9 @@ PROGRAM W3SHEL
     CALL CPL_OASIS_INIT(MPI_COMM)
   ELSE
 #endif
+#ifdef W3_COAWST_MODEL
+    IF (COAWSTED.EQ.0) THEN
+#endif
 #ifdef W3_OMPH
     ! For hybrid MPI-OpenMP specify required thread level. JGLi06Sep2019
     IF( FLHYBR ) THEN
@@ -483,6 +503,11 @@ PROGRAM W3SHEL
 #endif
 #ifdef W3_MPI
     MPI_COMM = MPI_COMM_WORLD
+#endif
+#ifdef W3_COAWST_MODEL
+    END IF
+    MPI_COMM = MyCOMM
+    WAV_COMM_WORLD = MyCOMM
 #endif
 #ifdef W3_OASIS
   END IF
@@ -600,9 +625,6 @@ PROGRAM W3SHEL
   NDS(11) = 22
   NDS(12) = 23
   NDS(13) = 34
-  NDS(14) = 36
-  NDS(15) = 37
-
   !
   NTRACE(1) =  NDS(3)
   NTRACE(2) =  10
@@ -1730,6 +1752,9 @@ PROGRAM W3SHEL
   TIME00 = TIME0
   TIMEEND = TIMEN
 #endif
+#ifdef W3_COAWST_MODEL
+  TIMEEND = TIMEN
+#endif
 #ifdef W3_NL5
   QI5TBEG = TIME0
 #endif
@@ -1782,6 +1807,17 @@ PROGRAM W3SHEL
       TTIME(1) = 0
       TTIME(2) = 0
       DTTST    = REAL ( ODAT(5*(J-1)+3) )
+!jcw if J=1, then DTTST above is the output time step for mean wave field params.
+#ifdef W3_WAVES_OCEAN
+      IF (J.EQ.1) THEN
+        DTTST=MIN(DTTST,REAL(TI_OCN2WAV))
+      END IF
+#endif
+#ifdef W3_AIR_WAVES
+      IF (J.EQ.1) THEN
+        DTTST=MIN(DTTST,REAL(TI_ATM2WAV))
+      END IF
+#endif
       CALL TICK21 ( TTIME , DTTST  )
       CALL STME21 ( TTIME , DTME21 )
       IF ( ( ODAT(5*(J-1)+1) .NE. ODAT(5*(J-1)+4) .OR.          &
@@ -1952,6 +1988,14 @@ PROGRAM W3SHEL
     CALL CPL_OASIS_DEFINE(NDSO, FLDIN, FLDOUT)
   END IF
 #endif
+#if defined W3_AIR_WAVES || defined W3_WAVES_OCEAN
+      CALL INIT_WVCP (1)
+      CALL INITIALIZE_WAV_ROUTERS
+!
+!     do not do first couple here, wait til end of init in w3wavemd.
+!     ccount=0
+!     CALL COAWST_CPL (ccount)
+#endif
 
 
   !--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2069,6 +2113,10 @@ PROGRAM W3SHEL
                  DSEC21 (TFN(:,J), TIMEEND) .GT. 0.0 ) DTTST=0.
           ENDIF
         ENDIF
+#endif
+#ifdef W3_COAWST_MODEL
+      ELSE
+        IF (DSEC21 (TIME, TIMEEND) .GT. 0.0) DTTST=0.
 #endif
       END IF
       !
@@ -2247,6 +2295,11 @@ PROGRAM W3SHEL
 #ifdef W3_OASOCM
               IF (.NOT.FLAGSC(J)) ID_OASIS_TIME = -1
 #endif
+#ifdef W3_WAVES_OCEAN
+              TFN(1,J)=TIME0(1)
+              TFN(2,J)=TIME0(2)
+              CALL TICK21(TFN(:,J),REAL(TI_OCN2WAV))
+#else
               CALL W3FLDG ('READ', IDSTR(J), NDSF(J),         &
                    NDST, NDSEN, NX, NY, NX, NY, TIME0, TIMEN, &
                    TTT, XXX, XXX, XXX, TLN, XXX, XXX, WLEV,   &
@@ -2255,6 +2308,7 @@ PROGRAM W3SHEL
                    , COUPL_COMM                       &
 #endif
                    )
+#endif
 #ifdef W3_TIDE
             END IF
 #endif
@@ -2295,6 +2349,11 @@ PROGRAM W3SHEL
 #ifdef W3_OASOCM
               IF (.NOT.FLAGSC(J)) ID_OASIS_TIME = -1
 #endif
+#ifdef W3_WAVES_OCEAN
+              TFN(1,J)=TIME0(1)
+              TFN(2,J)=TIME0(2)
+              CALL TICK21(TFN(:,J),REAL(TI_OCN2WAV))
+#else
               CALL W3FLDG ('READ', IDSTR(J), NDSF(J),         &
                    NDST, NDSEN, NX, NY, NX, NY, TIME0, TIMEN, &
                    TC0, CX0, CY0, XXX, TCN, CXN, CYN, XXX,    &
@@ -2303,6 +2362,7 @@ PROGRAM W3SHEL
                    , COUPL_COMM                       &
 #endif
                    )
+#endif
 #ifdef W3_TIDE
             END IF
 #endif
@@ -2331,6 +2391,11 @@ PROGRAM W3SHEL
 #ifdef W3_OASACM
             IF (.NOT.FLAGSC(J)) ID_OASIS_TIME = -1
 #endif
+#ifdef W3_AIR_WAVES
+              TFN(1,J)=TIME0(1)
+              TFN(2,J)=TIME0(2)
+              CALL TICK21(TFN(:,J),REAL(TI_ATM2WAV))
+#else
             CALL W3FLDG ('READ', IDSTR(J), NDSF(J),         &
                  NDST, NDSEN, NX, NY, NX, NY, TIME0, TIMEN, &
                  TW0, WX0, WY0, DT0, TWN, WXN, WYN, DTN,    &
@@ -2339,6 +2404,7 @@ PROGRAM W3SHEL
                  , COUPL_COMM                       &
 #endif
                  )
+#endif
           END IF
 
           ! ICE : ice conc.
@@ -2719,9 +2785,20 @@ PROGRAM W3SHEL
     CALL CPL_OASIS_FINALIZE
   ELSE
 #endif
+
+#ifdef W3_COAWST_MODEL
+      IF (COAWSTED.EQ.0) THEN
+#endif
 #ifdef W3_MPI
     CALL MPI_FINALIZE  ( IERR_MPI )
 #endif
+#ifdef W3_COAWST_MODEL
+      END IF
+#endif
+#if defined W3_AIR_WAVES || defined W3_WAVES_OCEAN
+      CALL FINALIZE_WAV_COUPLING(1)
+#endif
+
 #ifdef W3_OASIS
   END IF
 #endif
@@ -2921,4 +2998,9 @@ PROGRAM W3SHEL
   !/
   !/ End of W3SHEL ----------------------------------------------------- /
   !/
-END PROGRAM W3SHEL
+#ifdef W3_COAWST_MODEL
+      END SUBROUTINE WW3_init
+#else
+      END PROGRAM W3SHEL
+#endif
+

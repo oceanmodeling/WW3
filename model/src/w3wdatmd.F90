@@ -142,6 +142,9 @@ MODULE W3WDATMD
     INTEGER               :: TIME00(2)
     INTEGER               :: TIMEEND(2)
 #endif
+#ifdef W3_COAWST_MODEL
+    INTEGER               :: TIMEEND(2)
+#endif
 #ifdef W3_NL5
     INTEGER               :: QI5TBEG(2)
     REAL, POINTER         :: QR5TIM0(:), QR5CVK0(:, :), QR5TMIX(:)
@@ -173,6 +176,9 @@ MODULE W3WDATMD
        TIC1(:), TIC5(:)
 #ifdef W3_OASIS
   INTEGER, POINTER        :: TIME00(:)
+  INTEGER, POINTER        :: TIMEEND(:)
+#endif
+#ifdef W3_COAWST_MODEL
   INTEGER, POINTER        :: TIMEEND(:)
 #endif
 #ifdef W3_NL5
@@ -767,6 +773,9 @@ CONTAINS
 #endif
 #ifdef W3_NL5
     QI5TBEG => WDATAS(IMOD)%QI5TBEG
+#endif
+#ifdef W3_COAWST_MODEL
+    TIMEEND => WDATAS(IMOD)%TIMEEND
 #endif
     TLEV   => WDATAS(IMOD)%TLEV
     TICE   => WDATAS(IMOD)%TICE

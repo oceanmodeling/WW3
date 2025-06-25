@@ -174,8 +174,6 @@ MODULE W3ADATMD
   !      US3D      R.A.  Public   3D Stokes drift.
   !      USSP      R.A.  Public   Partitioned Surface Stokes drift
   !
-  !      USSHX/Y   R.A.  Public   Surface layer averaged Stokes drift.
-  !
   !      ABA       R.A.  Public   Near-bottom rms wave ex. amplitude.
   !      ABD       R.A.  Public   Corresponding direction.
   !      UBA       R.A.  Public   Near-bottom rms wave velocity.
@@ -189,7 +187,6 @@ MODULE W3ADATMD
   !      MSSD      R.A.  Public   Direction of MSSX
   !      MSCD      R.A.  Public   Direction of MSCX
   !      QP        R.A.  Public   Goda peakedness parameter.
-  !      QKK       R.A.  Public   Spectral bandwidth (De Carlo et al. 2023)
   !
   !      DTDYN     R.A.  Public   Mean dynamic time step (raw).
   !      FCUT      R.A.  Public   Cut-off frequency for tail.
@@ -400,6 +397,9 @@ MODULE W3ADATMD
     !
     REAL, POINTER         :: DW(:), UA(:), UD(:), U10(:), U10D(:),&
          AS(:), CX(:), CY(:), TAUA(:), TAUADIR(:)
+#ifdef W3_CURSP
+    REAL, POINTER         ::  CXTH(:,:), CYTH(:,:)
+#endif
     !
     ! Output fields group 2)
     !
@@ -456,6 +456,15 @@ MODULE W3ADATMD
          USSY(:), TAUOCX(:), TAUOCY(:),      &
          PRMS(:),  TPMS(:), PHICE(:),        &
          TAUICE(:,:)
+#ifdef W3_COAWST_MODEL
+    REAL, POINTER         :: USS_COAWST(:,:), VSS_COAWST(:,:),    &
+                             KSS_COAWST(:,:)
+    REAL, POINTER         :: PHIBRKX(:), PHIBRKY(:), QB(:)
+    REAL, POINTER         :: XPHIBRKX(:), XPHIBRKY(:)
+    REAL, POINTER         :: PHICAPX(:), PHICAPY(:)
+    REAL, POINTER         :: XPHICAPX(:), XPHICAPY(:)
+    REAL, POINTER         :: WLP(:)
+#endif
     REAL, POINTER         ::  P2SMS(:,:),  US3D(:,:), USSP(:,:)
     REAL, POINTER         :: XSXX(:), XSYY(:), XSXY(:), XTAUOX(:),&
          XTAUOY(:), XBHD(:), XPHIOC(:),       &
@@ -464,7 +473,6 @@ MODULE W3ADATMD
          XPRMS(:), XTPMS(:), XPHICE(:),       &
          XTAUICE(:,:)
     REAL, POINTER         :: XP2SMS(:,:), XUS3D(:,:), XUSSP(:,:)
-    REAL, POINTER         :: XUSSHX(:), XUSSHY(:)
     !
     ! Output fields group 7)
     !
@@ -478,9 +486,9 @@ MODULE W3ADATMD
     ! Output fields group 8)
     !
     REAL, POINTER         ::  MSSX(:),  MSSY(:),  MSSD(:),        &
-         MSCX(:),  MSCY(:),  MSCD(:), QKK(:)
+         MSCX(:),  MSCY(:),  MSCD(:)
     REAL, POINTER         ::  XMSSX(:), XMSSY(:), XMSSD(:),       &
-         XMSCX(:), XMSCY(:), XMSCD(:), XQKK(:)
+         XMSCX(:), XMSCY(:), XMSCD(:)
     !
     ! Output fields group 9)
     !
@@ -493,13 +501,15 @@ MODULE W3ADATMD
     !
     REAL, POINTER         ::  USERO(:,:)
     REAL, POINTER         :: XUSERO(:,:)
-    ! Output fileds for Langmuir mixing parameterization
-    REAL, POINTER         :: USSHX(:), USSHY(:)
     !
     ! Spatial derivatives
     !
     REAL, POINTER         :: DDDX(:,:), DDDY(:,:), DCXDX(:,:),    &
          DCYDX(:,:), DCXDY(:,:), DCYDY(:,:)
+#ifdef W3_CURSP
+    REAL, POINTER         :: DCXDXTH(:,:,:), DCYDXTH(:,:,:),      &
+                             DCXDYTH(:,:,:), DCYDYTH(:,:,:)
+#endif
     REAL, POINTER         :: DCDX(:,:,:), DCDY(:,:,:)
 #ifdef W3_SMC
     REAL, POINTER         :: DHDX(:), DHDY(:), DHLMT(:,:)
@@ -564,6 +574,9 @@ MODULE W3ADATMD
     REAL, POINTER         :: SPPNT(:,:,:)
     !
     INTEGER               :: ITIME, IPASS, IDLAST, NSEALM
+#ifdef W3_COAWST_MODEL
+    INTEGER               :: ITIME_COAWST
+#endif
     REAL, POINTER         :: ALPHA(:,:)
     LOGICAL               :: AINIT, AINIT2, FL_ALL, FLCOLD, FLIWND
     !
@@ -575,8 +588,6 @@ MODULE W3ADATMD
   !/
   !/ Data aliases for structure WADAT(S)
   !/
-  REAL, POINTER :: USSHX(:), USSHY(:)
-  !
   REAL, POINTER           :: CG(:,:), WN(:,:)
   REAL, POINTER           :: IC3WN_R(:,:), IC3WN_I(:,:), IC3CG(:,:)
   !
@@ -588,6 +599,9 @@ MODULE W3ADATMD
   !
   REAL, POINTER           :: DW(:), UA(:), UD(:), U10(:), U10D(:),&
        AS(:), CX(:), CY(:), TAUA(:), TAUADIR(:)
+#ifdef W3_CURSP
+  REAL, POINTER           ::  CXTH(:,:), CYTH(:,:)
+#endif
   !
   REAL, POINTER           :: HS(:), WLM(:),  T02(:), T0M1(:),     &
        T01 (:), FP0(:), THM(:), THS(:),     &
@@ -614,13 +628,20 @@ MODULE W3ADATMD
        TUSX(:), TUSY(:), USSX(:), USSY(:),  &
        TAUOCX(:), TAUOCY(:), PRMS(:),       &
        TPMS(:), PHICE(:), TAUICE(:,:)
+#ifdef W3_COAWST_MODEL
+  REAL, POINTER         :: USS_COAWST(:,:), VSS_COAWST(:,:),      &
+                           KSS_COAWST(:,:)
+  REAL, POINTER         :: PHIBRKX(:), PHIBRKY(:), QB(:)
+  REAL, POINTER         :: PHICAPX(:), PHICAPY(:)
+  REAL, POINTER         :: WLP(:)
+#endif
   REAL, POINTER           :: P2SMS(:,:), US3D(:,:), USSP(:,:)
   !
   REAL, POINTER           :: ABA(:), ABD(:), UBA(:), UBD(:),      &
        BEDFORMS(:,:), PHIBBL(:), TAUBBL(:,:)
   !
   REAL, POINTER           :: MSSX(:), MSSY(:), MSSD(:),           &
-       MSCX(:), MSCY(:), MSCD(:), QKK(:)
+       MSCX(:), MSCY(:), MSCD(:)
   !
   REAL, POINTER           :: DTDYN(:), FCUT(:), CFLXYMAX(:),      &
        CFLTHMAX(:), CFLKMAX(:)
@@ -631,6 +652,10 @@ MODULE W3ADATMD
   !
   REAL, POINTER           :: DDDX(:,:), DDDY(:,:), DCXDX(:,:),    &
        DCYDX(:,:), DCXDY(:,:), DCYDY(:,:)
+#ifdef W3_CURSP
+    REAL, POINTER         :: DCXDXTH(:,:,:), DCYDXTH(:,:,:),      &
+                             DCXDYTH(:,:,:), DCYDYTH(:,:,:)
+#endif
   REAL, POINTER           :: DCDX(:,:,:), DCDY(:,:,:)
 #ifdef W3_SMC
   REAL, POINTER         :: DHDX(:), DHDY(:), DHLMT(:,:)
@@ -689,6 +714,9 @@ MODULE W3ADATMD
   REAL, POINTER           :: SPPNT(:,:,:)
   !
   INTEGER, POINTER        :: ITIME, IPASS, IDLAST, NSEALM
+#ifdef W3_COAWST_MODEL
+  INTEGER,POINTER         :: ITIME_COAWST
+#endif
   REAL, POINTER           :: ALPHA(:,:)
   LOGICAL, POINTER        :: AINIT, AINIT2, FL_ALL, FLCOLD, FLIWND
   !/
@@ -800,6 +828,9 @@ CONTAINS
     !
     DO I=1, NGRIDS
       WADATS(I)%ITIME  = 0
+#ifdef W3_COAWST_MODEL
+      WADATS(I)%ITIME_COAWST = 0
+#endif
       WADATS(I)%IPASS  = 0
       WADATS(I)%IDLAST = 0
       WADATS(I)%NSEALM = 0
@@ -1015,6 +1046,15 @@ CONTAINS
     CHECK_ALLOC_STATUS ( ISTAT )
     WADATS(IMOD)%CX(:)=0.
     WADATS(IMOD)%CY(:)=0.
+
+#ifdef W3_CURSP
+    ALLOCATE ( WADATS(IMOD)%CXTH(0:NSEA,NK) , WADATS(IMOD)%CYTH(0:NSEA,NK) , &
+         STAT=ISTAT )
+    CHECK_ALLOC_STATUS ( ISTAT )
+    WADATS(IMOD)%CXTH(:,:)=0.
+    WADATS(IMOD)%CYTH(:,:)=0.
+#endif
+
     !
     ALLOCATE ( WADATS(IMOD)%UA(0:NSEA) , WADATS(IMOD)%UD(0:NSEA) , &
          WADATS(IMOD)%U10(NSEA)  , WADATS(IMOD)%U10D(NSEA) , &
@@ -1057,10 +1097,16 @@ CONTAINS
          WADATS(IMOD)%WNMEAN(NSEALM),                               &
          STAT=ISTAT )
     CHECK_ALLOC_STATUS ( ISTAT )
-
+#ifdef W3_COAWST_MODEL
+    ALLOCATE ( WADATS(IMOD)%WLP (NSEALM))
+    CHECK_ALLOC_STATUS ( ISTAT )
+#endif
     !
     WADATS(IMOD)%HS     = UNDEF
     WADATS(IMOD)%WLM    = UNDEF
+#ifdef W3_COAWST_MODEL
+    WADATS(IMOD)%WLP    = UNDEF
+#endif
     WADATS(IMOD)%T02    = UNDEF
     WADATS(IMOD)%T0M1   = UNDEF
     WADATS(IMOD)%T01    = UNDEF
@@ -1201,14 +1247,22 @@ CONTAINS
          WADATS(IMOD)%TUSY  (NSEALM) ,                        &
          WADATS(IMOD)%USSX  (NSEALM) ,                        &
          WADATS(IMOD)%USSY  (NSEALM) ,                        &
+#ifdef W3_COAWST_MODEL
+         WADATS(IMOD)%USS_COAWST (NSEALM,NK) ,                &
+         WADATS(IMOD)%VSS_COAWST (NSEALM,NK) ,                &
+         WADATS(IMOD)%KSS_COAWST (NSEALM,NK) ,                &
+         WADATS(IMOD)%PHIBRKX (NSEALM) ,                      &
+         WADATS(IMOD)%PHIBRKY (NSEALM) ,                      &
+         WADATS(IMOD)%QB (NSEALM) ,                           &
+         WADATS(IMOD)%PHICAPX (NSEALM) ,                     &
+         WADATS(IMOD)%PHICAPY (NSEALM) ,                     &
+#endif
          WADATS(IMOD)%TAUOCX(NSEALM) ,                        &
          WADATS(IMOD)%TAUOCY(NSEALM) ,                        &
          WADATS(IMOD)%PRMS  (NSEALM) ,                        &
          WADATS(IMOD)%TPMS  (NSEALM) ,                        &
          WADATS(IMOD)%PHICE (NSEALM) ,                        &
          WADATS(IMOD)%TAUICE(NSEALM,2),                       &
-         WADATS(IMOD)%USSHX(NSEALM),                          &
-         WADATS(IMOD)%USSHY(NSEALM),                          &
          STAT=ISTAT )
     CHECK_ALLOC_STATUS ( ISTAT )
     !
@@ -1239,14 +1293,22 @@ CONTAINS
     WADATS(IMOD)%TUSY   = UNDEF
     WADATS(IMOD)%USSX   = UNDEF
     WADATS(IMOD)%USSY   = UNDEF
+#ifdef W3_COAWST_MODEL
+    WADATS(IMOD)%USS_COAWST = UNDEF
+    WADATS(IMOD)%VSS_COAWST = UNDEF
+    WADATS(IMOD)%KSS_COAWST = UNDEF
+    WADATS(IMOD)%PHIBRKX = UNDEF
+    WADATS(IMOD)%PHIBRKY = UNDEF
+    WADATS(IMOD)%QB      = UNDEF
+    WADATS(IMOD)%PHICAPX = UNDEF
+    WADATS(IMOD)%PHICAPY = UNDEF
+#endif
     WADATS(IMOD)%TAUOCX = UNDEF
     WADATS(IMOD)%TAUOCY = UNDEF
     WADATS(IMOD)%PRMS   = UNDEF
     WADATS(IMOD)%TPMS   = UNDEF
     WADATS(IMOD)%PHICE  = UNDEF
     WADATS(IMOD)%TAUICE = UNDEF
-    WADATS(IMOD)%USSHX  = UNDEF
-    WADATS(IMOD)%USSHY  = UNDEF
     IF (  P2MSF(1).GT.0 ) WADATS(IMOD)%P2SMS  = UNDEF
     IF (  US3DF(1).GT.0 ) WADATS(IMOD)%US3D   = UNDEF
     IF (  USSPF(1).GT.0 ) WADATS(IMOD)%USSP   = UNDEF
@@ -1277,7 +1339,7 @@ CONTAINS
     ALLOCATE ( WADATS(IMOD)%MSSX(NSEALM), WADATS(IMOD)%MSSY(NSEALM), &
          WADATS(IMOD)%MSCX(NSEALM), WADATS(IMOD)%MSCY(NSEALM), &
          WADATS(IMOD)%MSSD(NSEALM), WADATS(IMOD)%MSCD(NSEALM), &
-         WADATS(IMOD)%QKK(NSEALM), STAT=ISTAT )
+         STAT=ISTAT )
     CHECK_ALLOC_STATUS ( ISTAT )
     !
     WADATS(IMOD)%MSSX   = UNDEF
@@ -1286,7 +1348,6 @@ CONTAINS
     WADATS(IMOD)%MSCX   = UNDEF
     WADATS(IMOD)%MSCY   = UNDEF
     WADATS(IMOD)%MSCD   = UNDEF
-    WADATS(IMOD)%QKK    = UNDEF
     call print_memcheck(memunit, 'memcheck_____:'//' W3DIMA 8')
     !
     ! 9) Numerical diagnostics
@@ -1385,6 +1446,12 @@ CONTAINS
              WADATS(IMOD)%DCYDX(NY,NX) ,          &
              WADATS(IMOD)%DCXDY(NY,NX) ,          &
              WADATS(IMOD)%DCYDY(NY,NX) , STAT=ISTAT           )
+#ifdef W3_CURSP
+        ALLOCATE ( WADATS(IMOD)%DCXDXTH(NY,NX,NK),&
+             WADATS(IMOD)%DCYDXTH(NY,NX,NK) ,     &
+             WADATS(IMOD)%DCXDYTH(NY,NX,NK) ,     &
+             WADATS(IMOD)%DCYDYTH(NY,NX,NK) , STAT=ISTAT      )
+#endif
       ELSE
         ALLOCATE ( WADATS(IMOD)%DDDX(1,NSEAL)  ,  &
              WADATS(IMOD)%DDDY(1,NSEAL)  ,        &
@@ -1395,6 +1462,13 @@ CONTAINS
              WADATS(IMOD)%DCXDY(1,NSEAL) ,        &
              WADATS(IMOD)%DCYDY(1,NSEAL) ,        &
              STAT=ISTAT           )
+#ifdef W3_CURSP
+        ALLOCATE ( WADATS(IMOD)%DCXDXTH(1,NSEAL,NK), &
+             WADATS(IMOD)%DCYDXTH(1,NSEAL,NK) ,      &
+             WADATS(IMOD)%DCXDYTH(1,NSEAL,NK) ,      &
+             WADATS(IMOD)%DCYDYTH(1,NSEAL,NK) ,      &
+             STAT=ISTAT           )
+#endif
       ENDIF
       CHECK_ALLOC_STATUS ( ISTAT )
       WADATS(IMOD)%DDDX = 0.
@@ -1405,6 +1479,12 @@ CONTAINS
       WADATS(IMOD)%DCYDX = 0.
       WADATS(IMOD)%DCXDY = 0.
       WADATS(IMOD)%DCYDY = 0.
+#ifdef W3_CURSP
+      WADATS(IMOD)%DCXDXTH = 0.
+      WADATS(IMOD)%DCYDXTH = 0.
+      WADATS(IMOD)%DCXDYTH = 0.
+      WADATS(IMOD)%DCYDYTH = 0.
+#endif
       !
 #ifdef W3_SMC
       ALLOCATE ( WADATS(IMOD)%DHDX(NSEA) ,                  &
@@ -2158,21 +2238,17 @@ CONTAINS
       ALLOCATE ( WADATS(IMOD)%XTAUOCY(NXXX), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
     ELSE
+#ifdef W3_COAWST_MODEL
+      ALLOCATE ( WADATS(IMOD)%XTAUOCX(NXXX), STAT=ISTAT )
+      CHECK_ALLOC_STATUS ( ISTAT )
+      ALLOCATE ( WADATS(IMOD)%XTAUOCY(NXXX), STAT=ISTAT )
+      CHECK_ALLOC_STATUS ( ISTAT )
+#else
       ALLOCATE ( WADATS(IMOD)%XTAUOCX(1), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
       ALLOCATE ( WADATS(IMOD)%XTAUOCY(1), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
-    END IF
-    IF ( OUTFLAGS( 6, 14) ) THEN
-      ALLOCATE ( WADATS(IMOD)%XUSSHX(NXXX), STAT=ISTAT )
-      CHECK_ALLOC_STATUS ( ISTAT )
-      ALLOCATE ( WADATS(IMOD)%XUSSHY(NXXX), STAT=ISTAT )
-      CHECK_ALLOC_STATUS ( ISTAT )
-    ELSE
-      ALLOCATE ( WADATS(IMOD)%XUSSHX(1), STAT=ISTAT )
-      CHECK_ALLOC_STATUS ( ISTAT )
-      ALLOCATE ( WADATS(IMOD)%XUSSHY(1), STAT=ISTAT )
-      CHECK_ALLOC_STATUS ( ISTAT )
+#endif
     END IF
     !
     WADATS(IMOD)%XSXX    = UNDEF
@@ -2195,8 +2271,6 @@ CONTAINS
     WADATS(IMOD)%XUSSP   = UNDEF
     WADATS(IMOD)%XTAUOCX = UNDEF
     WADATS(IMOD)%XTAUOCY = UNDEF
-    WADATS(IMOD)%XUSSHX   = UNDEF
-    WADATS(IMOD)%XUSSHY   = UNDEF
     !
     IF ( OUTFLAGS( 7, 1) ) THEN
       ALLOCATE ( WADATS(IMOD)%XABA(NXXX), STAT=ISTAT )
@@ -2234,8 +2308,13 @@ CONTAINS
       ALLOCATE ( WADATS(IMOD)%XPHIBBL(NXXX), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
     ELSE
+#ifdef W3_COAWST_MODEL
+      ALLOCATE ( WADATS(IMOD)%XPHIBBL(NXXX), STAT=ISTAT )
+      CHECK_ALLOC_STATUS ( ISTAT )
+#else
       ALLOCATE ( WADATS(IMOD)%XPHIBBL(1), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
+#endif
     END IF
     !
     IF ( OUTFLAGS( 7, 5) ) THEN
@@ -2245,6 +2324,16 @@ CONTAINS
       ALLOCATE ( WADATS(IMOD)%XTAUBBL(1,2), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
     END IF
+#ifdef W3_COAWST_MODEL
+      ALLOCATE ( WADATS(IMOD)%XPHIBRKX(NXXX), STAT=ISTAT )
+      CHECK_ALLOC_STATUS ( ISTAT )
+      ALLOCATE ( WADATS(IMOD)%XPHIBRKY(NXXX), STAT=ISTAT )
+      CHECK_ALLOC_STATUS ( ISTAT )
+      ALLOCATE ( WADATS(IMOD)%XPHICAPX(NXXX), STAT=ISTAT )
+      CHECK_ALLOC_STATUS ( ISTAT )
+      ALLOCATE ( WADATS(IMOD)%XPHICAPY(NXXX), STAT=ISTAT )
+      CHECK_ALLOC_STATUS ( ISTAT )
+#endif
     !
     WADATS(IMOD)%XABA    = UNDEF
     WADATS(IMOD)%XABD    = UNDEF
@@ -2253,6 +2342,12 @@ CONTAINS
     WADATS(IMOD)%XBEDFORMS = UNDEF
     WADATS(IMOD)%XPHIBBL = UNDEF
     WADATS(IMOD)%XTAUBBL = UNDEF
+#ifdef W3_COAWST_MODEL
+    WADATS(IMOD)%XPHIBRKX = UNDEF
+    WADATS(IMOD)%XPHIBRKY = UNDEF
+    WADATS(IMOD)%XPHICAPX = UNDEF
+    WADATS(IMOD)%XPHICAPY = UNDEF
+#endif
     !
     IF ( OUTFLAGS( 8, 1) ) THEN
       ALLOCATE ( WADATS(IMOD)%XMSSX(NXXX), STAT=ISTAT )
@@ -2300,12 +2395,6 @@ CONTAINS
       ALLOCATE ( WADATS(IMOD)%XQP(1) )
     END IF
     !
-    IF ( OUTFLAGS( 8,  6) ) THEN
-      ALLOCATE ( WADATS(IMOD)%XQKK(NXXX) )
-    ELSE
-      ALLOCATE ( WADATS(IMOD)%XQKK(1) )
-    END IF
-    !
     WADATS(IMOD)%XMSSX   = UNDEF
     WADATS(IMOD)%XMSSY   = UNDEF
     WADATS(IMOD)%XMSSD   = UNDEF
@@ -2313,7 +2402,6 @@ CONTAINS
     WADATS(IMOD)%XMSCY   = UNDEF
     WADATS(IMOD)%XMSCD   = UNDEF
     WADATS(IMOD)%XQP(1)  = UNDEF
-    WADATS(IMOD)%XQKK    = UNDEF
     !
     IF ( OUTFLAGS( 9, 1) ) THEN
       ALLOCATE ( WADATS(IMOD)%XDTDYN(NXXX), STAT=ISTAT )
@@ -2752,6 +2840,9 @@ CONTAINS
     ! 3.  Set pointers
     !
     ITIME  => WADATS(IMOD)%ITIME
+#ifdef W3_COAWST_MODEL
+    ITIME_COAWST  => WADATS(IMOD)%ITIME_COAWST
+#endif
     IPASS  => WADATS(IMOD)%IPASS
     IDLAST => WADATS(IMOD)%IDLAST
     NSEALM => WADATS(IMOD)%NSEALM
@@ -2835,11 +2926,18 @@ CONTAINS
       AS     => WADATS(IMOD)%AS
       CX     => WADATS(IMOD)%CX
       CY     => WADATS(IMOD)%CY
+#ifdef W3_CURSP
+      CXTH     => WADATS(IMOD)%CXTH
+      CYTH     => WADATS(IMOD)%CYTH
+#endif
       TAUA   => WADATS(IMOD)%TAUA
       TAUADIR=> WADATS(IMOD)%TAUADIR
       !
       HS     => WADATS(IMOD)%HS
       WLM    => WADATS(IMOD)%WLM
+#ifdef W3_COAWST_MODEL
+      WLP    => WADATS(IMOD)%WLP
+#endif
       T02    => WADATS(IMOD)%T02
       T0M1   => WADATS(IMOD)%T0M1
       T01    => WADATS(IMOD)%T01
@@ -2903,6 +3001,16 @@ CONTAINS
       TUSY   => WADATS(IMOD)%TUSY
       USSX   => WADATS(IMOD)%USSX
       USSY   => WADATS(IMOD)%USSY
+#ifdef W3_COAWST_MODEL
+      USS_COAWST   => WADATS(IMOD)%USS_COAWST
+      VSS_COAWST   => WADATS(IMOD)%VSS_COAWST
+      KSS_COAWST   => WADATS(IMOD)%KSS_COAWST
+      PHIBRKX      => WADATS(IMOD)%PHIBRKX
+      PHIBRKY      => WADATS(IMOD)%PHIBRKY
+      QB           => WADATS(IMOD)%QB
+      PHICAPX     => WADATS(IMOD)%PHICAPX
+      PHICAPY     => WADATS(IMOD)%PHICAPY
+#endif
       PRMS   => WADATS(IMOD)%PRMS
       TPMS   => WADATS(IMOD)%TPMS
       P2SMS  => WADATS(IMOD)%P2SMS
@@ -2927,7 +3035,6 @@ CONTAINS
       MSCX   => WADATS(IMOD)%MSCX
       MSCY   => WADATS(IMOD)%MSCY
       MSCD   => WADATS(IMOD)%MSCD
-      QKK    => WADATS(IMOD)%QKK
       !
       DTDYN    => WADATS(IMOD)%DTDYN
       FCUT     => WADATS(IMOD)%FCUT
@@ -2938,8 +3045,6 @@ CONTAINS
       USERO  => WADATS(IMOD)%USERO
       !
       WN     => WADATS(IMOD)%WN
-      USSHX  => WADATS(IMOD)%USSHX
-      USSHY  => WADATS(IMOD)%USSHY
 #ifdef W3_IC3
       IC3WN_R=> WADATS(IMOD)%IC3WN_R
       IC3WN_I=> WADATS(IMOD)%IC3WN_I
@@ -2963,6 +3068,12 @@ CONTAINS
         DCYDX  => WADATS(IMOD)%DCYDX
         DCXDY  => WADATS(IMOD)%DCXDY
         DCYDY  => WADATS(IMOD)%DCYDY
+#ifdef W3_CURSP
+        DCXDXTH  => WADATS(IMOD)%DCXDXTH
+        DCYDXTH  => WADATS(IMOD)%DCYDXTH
+        DCXDYTH  => WADATS(IMOD)%DCXDYTH
+        DCYDYTH  => WADATS(IMOD)%DCYDYTH
+#endif
         !
 #ifdef W3_SMC
         DHDX   => WADATS(IMOD)%DHDX
@@ -3180,6 +3291,15 @@ CONTAINS
     !
     IF ( AINIT2 ) THEN
       !
+#ifdef W3_COAWST_MODEL
+      TAUOCX  => WADATS(IMOD)%XTAUOCX
+      TAUOCY  => WADATS(IMOD)%XTAUOCY
+      PHIBRKX => WADATS(IMOD)%XPHIBRKX
+      PHIBRKY => WADATS(IMOD)%XPHIBRKY
+      PHICAPX => WADATS(IMOD)%XPHICAPX
+      PHICAPY => WADATS(IMOD)%XPHICAPY
+      PHIBBL  => WADATS(IMOD)%XPHIBBL
+#endif
       HS     => WADATS(IMOD)%XHS
       WLM    => WADATS(IMOD)%XWLM
       T02    => WADATS(IMOD)%XT02
@@ -3268,7 +3388,6 @@ CONTAINS
       MSCX   => WADATS(IMOD)%XMSCX
       MSCY   => WADATS(IMOD)%XMSCY
       MSCD   => WADATS(IMOD)%XMSCD
-      QKK    => WADATS(IMOD)%XQKK
       !
       DTDYN    => WADATS(IMOD)%XDTDYN
       FCUT     => WADATS(IMOD)%XFCUT
@@ -3277,9 +3396,6 @@ CONTAINS
       CFLKMAX =>  WADATS(IMOD)%XCFLKMAX
       !
       USERO  => WADATS(IMOD)%XUSERO
-      !
-      USSHX   => WADATS(IMOD)%XUSSHX
-      USSHY   => WADATS(IMOD)%XUSSHY
       !
     END IF
     !

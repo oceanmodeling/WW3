@@ -20,13 +20,10 @@ if(hasParent)
   remove_definitions(-DDEBUG)
 endif()
 
-set(valid_caps "MULTI_ESMF" "NUOPC_MESH")
-
-set(UFS_CAP "" CACHE STRING "Valid options are ${valid_caps}")
+set(MULTI_ESMF OFF CACHE BOOL "Build ww3_multi_esmf library")
 set(NETCDF ON CACHE BOOL "Build NetCDF programs (requires NetCDF)")
 set(ENDIAN "BIG" CACHE STRING "Endianness of unformatted output files. Valid values are 'BIG', 'LITTLE', 'NATIVE'.") 
 set(EXCLUDE_FIND "" CACHE STRING "Don't try and search for these libraries (assumd to be handled by the compiler/wrapper)")
-set(BUILD_TOOLS OFF CACHE BOOL "Build WW3 tools")
 
 # make sure all "exclude_find" entries are lower case
 list(TRANSFORM EXCLUDE_FIND TOLOWER)
@@ -47,12 +44,6 @@ else()
   endif()
 endif()
 
-if(UFS_CAP)
-  if(NOT UFS_CAP IN_LIST valid_caps)
-    message(FATAL_ERROR "Invalid UFS_CAP selection. Valids options are ${valid_caps}")
-  endif()
-endif()
-
 message(STATUS "Build with switch: ${switch_file}")
 # Copy switch file to build dir
 configure_file(${switch_file} ${CMAKE_BINARY_DIR}/switch COPYONLY)
@@ -67,9 +58,3 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "^(Debug|Release|RelWithDebInfo|MinSizeRel)$")
 endif()
 
 add_subdirectory(model)
-
-# Turn on unit testing.
-include(CTest)
-if(BUILD_TESTING)
-  add_subdirectory(regtests/unittests)
-endif()

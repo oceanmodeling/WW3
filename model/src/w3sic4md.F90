@@ -355,10 +355,6 @@ CONTAINS
     REAL                    :: ICECOEF1, ICECOEF2, ICECOEF3, &
          ICECOEF4, ICECOEF5, ICECOEF6, &
          ICECOEF7, ICECOEF8
-
-    REAL                    :: x1,x2,x3,x1sqr,x2sqr,x3sqr   !case 8
-    REAL                    :: perfour,amhb,bmhb            !case 8
-
     REAL                    :: KI1,KI2,KI3,KI4,FC5,FC6,FC7,FREQ
     REAL                    :: HS, EMEAN, HICE
     REAL, ALLOCATABLE       :: WN_I(:)  ! exponential decay rate for amplitude
@@ -431,6 +427,7 @@ CONTAINS
     IF (INFLAGS2(-2)) ICECOEF6 = MUDD(IX,IY) ! a.k.a. MDN
     IF (INFLAGS2(-1)) ICECOEF7 = MUDT(IX,IY) ! a.k.a. MTH
     IF (INFLAGS2(0 )) ICECOEF8 = MUDV(IX,IY) ! a.k.a. MVS
+
     IC4METHOD = IC4PARS(1)
     !
     ! x.  No ice --------------------------------------------------------- /
@@ -556,41 +553,6 @@ CONTAINS
       END DO
       WN_I= 0.5 * ALPHA
 
-    CASE (8)
-      !CMB added option of cubic fit to Meylan, Horvat & Bitz in prep
-      ! ICECOEF1 is thickness
-      ! ICECOEF5 is floe size
-      ! TPI/SIG is period
-      x3=min(ICECOEF1,3.5)        ! limit thickness to 3.5 m
-      x3=max(x3,0.1)        ! limit thickness >0.1 m since I make fit below
-      x2=min(ICECOEF5*0.5,100.0)  ! convert dia to radius, limit to 100m
-      x2=max(2.5,x2)
-      x2sqr=x2*x2
-      x3sqr=x3*x3
-      amhb = 2.12e-3
-      bmhb = 4.59e-2
-
-      DO IK=1, NK
-        x1=TPI/SIG(IK)   ! period
-        x1sqr=x1*x1
-        KARG1(ik)=-0.26982 + 1.5043*x3 - 0.70112*x3sqr + 0.011037*x2 +  &
-             (-0.0073178)*x2*x3 + 0.00036604*x2*x3sqr + &
-             (-0.00045789)*x2sqr + 1.8034e-05*x2sqr*x3 + &
-             (-0.7246)*x1 + 0.12068*x1*x3 + &
-             (-0.0051311)*x1*x3sqr + 0.0059241*x1*x2 + &
-             0.00010771*x1*x2*x3 - 1.0171e-05*x1*x2sqr + &
-             0.0035412*x1sqr - 0.0031893*x1sqr*x3 + &
-             (-0.00010791)*x1sqr*x2 + &
-             0.00031073*x1**3 + 1.5996e-06*x2**3 + 0.090994*x3**3
-        KARG1(ik)=min(karg1(ik),0.0)
-        WN_I(ik)  = 10.0**KARG1(ik)
-        perfour=x1sqr*x1sqr
-        if ((x1.gt.5.0) .and. (x1.lt.20.0)) then
-          WN_I(IK) = WN_I(IK) + amhb/x1sqr+bmhb/perfour
-        else if (x1.gt.20.0) then
-          WN_I(IK) = amhb/x1sqr+bmhb/perfour
-        endif
-      end do
     CASE DEFAULT
       WN_I = ICECOEF1 !Default to IC1: Uniform in k
 

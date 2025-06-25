@@ -239,9 +239,6 @@ CONTAINS
     !                              (first).
     !                          11: Track information file unit number.
     !                          12: Track output file unit number.
-    !                          13: Wave separation output file unit number.
-    !                          14: Grid output file unit number.
-    !                          15: Point output file unit number. ascii
     !       MTRACE  I.A.   I   Array with subroutine tracing information.
     !                           1: Output unit number for trace.
     !                           2: Maximum number of trace prints.
@@ -448,12 +445,6 @@ CONTAINS
 #ifdef W3_UOST
     USE W3UOSTMD, ONLY: UOST_SETGRID
 #endif
-    use w3timemd,        only : set_user_timestring
-    use w3odatmd,        only : runtype, restart_from_binary, use_restartnc, user_restfname
-    use w3odatmd,        only : logfile_is_assigned
-#ifdef W3_PIO
-    use wav_restart_mod, only : read_restart
-#endif
     !/
 #ifdef W3_MPI
     INCLUDE "mpif.h"
@@ -462,7 +453,7 @@ CONTAINS
     !/ ------------------------------------------------------------------- /
     !/ Parameter list
     !/
-    INTEGER, INTENT(IN)           :: IMOD, MDS(15), MTRACE(2),      &
+    INTEGER, INTENT(IN)           :: IMOD, MDS(13), MTRACE(2),      &
          ODAT(40),NPT, IPRT(6),&
          MPI_COMM
     LOGICAL, INTENT(IN)           :: IsMulti
@@ -521,10 +512,7 @@ CONTAINS
 #ifdef W3_PDLIB
     INTEGER                 :: IScal(1), IPROC
 #endif
-    logical                 :: exists
     integer                 :: memunit
-    character(len=16)       :: user_timestring    !YYYY-MM-DD-SSSSS
-    character(len=1024)     :: fname
     !/
     !/ ------------------------------------------------------------------- /
     !
@@ -651,53 +639,51 @@ CONTAINS
     IF (FSTOTALIMP .and. .NOT. LPDLIB) THEN
       WRITE(NDSE,*) 'IMPTOTAL is selected'
       WRITE(NDSE,*) 'But PDLIB is not'
-      CALL FLUSH(NDSE)
-      STOP
+      CALL FLUSH(NDSE) 
+      STOP 
     ELSE IF (FSTOTALEXP .and. .NOT. LPDLIB) THEN
       WRITE(NDSE,*) 'EXPTOTAL is selected'
       WRITE(NDSE,*) 'But PDLIB is not'
-      CALL FLUSH(NDSE)
-      STOP
+      CALL FLUSH(NDSE) 
+      STOP 
     END IF
 #ifdef W3_PDLIB
     IF (B_JGS_BLOCK_GAUSS_SEIDEL .AND. .NOT. B_JGS_USE_JACOBI) THEN
       WRITE(NDSE,*) 'B_JGS_BLOCK_GAUSS_SEIDEL is used but the Jacobi solver is not choosen'
       WRITE(NDSE,*) 'Please set JGS_USE_JACOBI .eqv. .true.'
-      CALL FLUSH(NDSE)
-      STOP
+      CALL FLUSH(NDSE) 
+      STOP 
     ENDIF
 #endif
-
+      
     !
     ! 1.c Open files without unpacking MDS ,,,
     !
-    if (.not. logfile_is_assigned) then
-      IE     = LEN_TRIM(FEXT)
-      LFILE  = 'log.' // FEXT(:IE)
-      IFL    = LEN_TRIM(LFILE)
+    IE     = LEN_TRIM(FEXT)
+    LFILE  = 'log.' // FEXT(:IE)
+    IFL    = LEN_TRIM(LFILE)
 #ifdef W3_SHRD
-      TFILE  = 'test.' // FEXT(:IE)
+    TFILE  = 'test.' // FEXT(:IE)
 #endif
 #ifdef W3_DIST
-      IW     = 1 + INT ( LOG10 ( REAL(NAPROC) + 0.5 ) )
-      IW     = MAX ( 3 , MIN ( 9 , IW ) )
-      WRITE (FORMAT,'(A5,I1.1,A1,I1.1,A4)')                    &
-           '(A4,I', IW, '.', IW, ',2A)'
-      WRITE (TFILE,FORMAT) 'test',                             &
-           OUTPTS(IMOD)%IAPROC, '.', FEXT(:IE)
+    IW     = 1 + INT ( LOG10 ( REAL(NAPROC) + 0.5 ) )
+    IW     = MAX ( 3 , MIN ( 9 , IW ) )
+    WRITE (FORMAT,'(A5,I1.1,A1,I1.1,A4)')                    &
+         '(A4,I', IW, '.', IW, ',2A)'
+    WRITE (TFILE,FORMAT) 'test',                             &
+         OUTPTS(IMOD)%IAPROC, '.', FEXT(:IE)
 #endif
-      IFT    = LEN_TRIM(TFILE)
-      J      = LEN_TRIM(FNMPRE)
-      !
-      IF ( OUTPTS(IMOD)%IAPROC .EQ. OUTPTS(IMOD)%NAPLOG )             &
-           OPEN (MDS(1),FILE=FNMPRE(:J)//LFILE(:IFL),ERR=888,IOSTAT=IERR)
-      !
-      IF ( MDS(3).NE.MDS(1) .AND. MDS(3).NE.MDS(4) .AND. TSTOUT ) THEN
-        INQUIRE (MDS(3),OPENED=OPENED)
-        IF ( .NOT. OPENED ) OPEN (MDS(3),FILE=FNMPRE(:J)//TFILE(:IFT), ERR=889, &
-             IOSTAT=IERR)
-      END IF
-    end if ! if (.not. logfile_is_assigned)
+    IFT    = LEN_TRIM(TFILE)
+    J      = LEN_TRIM(FNMPRE)
+    !
+    IF ( OUTPTS(IMOD)%IAPROC .EQ. OUTPTS(IMOD)%NAPLOG ) &
+         OPEN (MDS(1), FILE=FNMPRE(:J)//LFILE(:IFL),ERR=888,IOSTAT=IERR)
+    !
+    IF ( MDS(3).NE.MDS(1) .AND. MDS(3).NE.MDS(4) .AND. TSTOUT ) THEN
+      INQUIRE (MDS(3),OPENED=OPENED)
+      IF ( .NOT. OPENED ) OPEN (MDS(3),FILE=FNMPRE(:J)//TFILE(:IFT), ERR=889, &
+           IOSTAT=IERR)
+    END IF
     !
     ! 1.d Dataset unit numbers
     !
@@ -737,7 +723,6 @@ CONTAINS
     ! 2.a Read model definition file
     !
     CALL W3IOGR ( 'READ', NDS(5), IMOD, FEXT )
-
     IF (GTYPE .eq. UNGTYPE) THEN
       CALL SPATIAL_GRID
       CALL NVECTRI
@@ -965,69 +950,40 @@ CONTAINS
     ! 3.a Read restart file
     !
     VA(:,:) = 0.
-#ifdef W3_PIO
-    if (use_restartnc) then
-      if (runtype == 'continue' )then
-        call set_user_timestring(time,user_timestring)
-        if (restart_from_binary) then
-          fname = trim(user_restfname)//trim(user_timestring)
-        else
-          fname = trim(user_restfname)//trim(user_timestring)//'.nc'
-        endif
-        inquire(file=trim(fname), exist=exists)
-        if (exists) then
-          if (restart_from_binary) then
-            call w3iors('READ', nds(6), sig(nk), imod, filename=trim(fname))
-          else
-            call read_restart(trim(fname), va=va, mapsta=mapsta, mapst2=mapst2)
-          end if
-        else
-          call extcde (60, msg="required restart file " // trim(fname) // " does not exist")
-        end if
-      else
-        call read_restart('none')
-        ! mapst2 is module variable defined in read of mod_def; maptst is from 2.b above
-        flcold = .true.
-      end if
-    else
-#endif
-
 #ifdef W3_DEBUGCOH
-      CALL ALL_VA_INTEGRAL_PRINT(IMOD, "Before W3IORS call", 1)
+    CALL ALL_VA_INTEGRAL_PRINT(IMOD, "Before W3IORS call", 1)
 #endif
 #ifdef W3_TIMINGS
-      CALL PRINT_MY_TIME("Before W3IORS")
+    CALL PRINT_MY_TIME("Before W3IORS")
 #endif
-      CALL W3IORS ( 'READ', NDS(6), SIG(NK), IMOD)
+    CALL W3IORS ( 'READ', NDS(6), SIG(NK), IMOD)
 #ifdef W3_TIMINGS
-      CALL PRINT_MY_TIME("After W3IORS")
+    CALL PRINT_MY_TIME("After W3IORS")
 #endif
-      call print_memcheck(memunit, 'memcheck_____:'//' WW3_INIT SECTION 3a')
+    call print_memcheck(memunit, 'memcheck_____:'//' WW3_INIT SECTION 3a')
 
 #ifdef W3_DEBUGCOH
-      CALL ALL_VA_INTEGRAL_PRINT(IMOD, "After W3IORS call", 1)
+    CALL ALL_VA_INTEGRAL_PRINT(IMOD, "After W3IORS call", 1)
 #endif
-      FLCOLD = RSTYPE.LE.1  .OR. RSTYPE.EQ.4
-      IF ( IAPROC .EQ. NAPLOG ) THEN
-        IF (RSTYPE.EQ.0) THEN
-          WRITE (NDSO,930) 'cold start (idealized).'
-        ELSE IF ( RSTYPE .EQ. 1 ) THEN
-          WRITE (NDSO,930) 'cold start (wind).'
-        ELSE IF ( RSTYPE .EQ. 4 ) THEN
-          WRITE (NDSO,930) 'cold start (calm).'
-        ELSE
-          WRITE (NDSO,930) 'full restart.'
-        END IF
+    FLCOLD = RSTYPE.LE.1  .OR. RSTYPE.EQ.4
+    IF ( IAPROC .EQ. NAPLOG ) THEN
+      IF (RSTYPE.EQ.0) THEN
+        WRITE (NDSO,930) 'cold start (idealized).'
+      ELSE IF ( RSTYPE .EQ. 1 ) THEN
+        WRITE (NDSO,930) 'cold start (wind).'
+      ELSE IF ( RSTYPE .EQ. 4 ) THEN
+        WRITE (NDSO,930) 'cold start (calm).'
+      ELSE
+        WRITE (NDSO,930) 'full restart.'
       END IF
+    END IF
 #ifdef W3_DEBUGCOH
-      CALL ALL_VA_INTEGRAL_PRINT(IMOD, "W3INIT, step 4.2", 1)
+    CALL ALL_VA_INTEGRAL_PRINT(IMOD, "W3INIT, step 4.2", 1)
 #endif
 #ifdef W3_TIMINGS
-      CALL PRINT_MY_TIME("After restart inits")
+    CALL PRINT_MY_TIME("After restart inits")
 #endif
-#ifdef W3_PIO
-    end if ! if (use_restartnc)
-#endif
+
     !
     ! 3.b Compare MAPSTA from grid and restart
     !
@@ -1305,6 +1261,7 @@ CONTAINS
     !
     MAPTST = MOD(MAPST2/2,2)
     MAPST2 = MAPST2 - 2*MAPTST
+
     !
     !Li   For multi-resolution SMC grid, these 1-NX and 1-NY nested loops
     !Li   may miss the refined cells as they are not 1-1 corresponding to
@@ -1346,10 +1303,10 @@ CONTAINS
     END DO
     !Li   END DO
 #ifdef W3_DEBUGSTP
-    WRITE(740+IAPROC,*) 'w3initmd 1: max/min(WLVeff)=', max_val, min_val
-    FLUSH(740+IAPROC)
-    max_val = 0
-    min_val = 0
+      WRITE(740+IAPROC,*) 'w3initmd 1: max/min(WLVeff)=', max_val, min_val
+      FLUSH(740+IAPROC)
+      max_val = 0
+      min_val = 0
 #endif
     DO JSEA=1, NSEAL
       CALL INIT_GET_ISEA(ISEA, JSEA)
@@ -1378,10 +1335,12 @@ CONTAINS
       CALL SET_IOBDP_PDLIB
     ENDIF
 #endif
+
     !
 #ifdef W3_DEBUGCOH
     CALL ALL_VA_INTEGRAL_PRINT(IMOD, "W3INIT, step 8.2", 1)
 #endif
+
     !
     MAPST2 = MAPST2 + 2*MAPTST
     !
@@ -1435,6 +1394,7 @@ CONTAINS
         !
       END DO
     END DO
+
     !
     ! 6.  Initialize arrays ---------------------------------------------- /
     !     Some initialized in W3IORS
@@ -1451,7 +1411,7 @@ CONTAINS
     !
     ! 7.  Write info to log file ----------------------------------------- /
     !
-    IF ( IAPROC .EQ. NAPLOG) THEN
+    IF ( IAPROC .EQ. NAPLOG ) THEN
       !
       WRITE (NDSO,970) GNAME
       IF (   FLLEV    ) WRITE (NDSO,971) 'Prescribed'
@@ -1538,9 +1498,7 @@ CONTAINS
         WRITE (NDSO,990) DTME21
       END IF
       !
-      if (.not. logfile_is_assigned) then
-        WRITE (NDSO,984)
-      end if
+      WRITE (NDSO,984)
       !
     END IF
     !
@@ -2189,10 +2147,12 @@ CONTAINS
          STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD,     &
          HCMAXD, QP, PTHP0, PQP, PPE, PGW, PSW,    &
          PTM1, PT1, PT2, PEP, WBT, CX, CY,         &
-         TAUOCX, TAUOCY, WNMEAN, QKK
+         TAUOCX, TAUOCY, WNMEAN
+# ifdef W3_COAWST_MODEL
+    USE W3ADATMD, ONLY: PHIBRKX, PHIBRKY
+    USE W3ADATMD, ONLY: PHICAPX, PHICAPY
+# endif
 #endif
-
-    USE W3ADATMD, ONLY: USSHX, USSHY
 
 #ifdef W3_MPI
     USE W3GDATMD, ONLY: NK
@@ -2211,7 +2171,6 @@ CONTAINS
 #endif
     USE W3GDATMD, ONLY: GTYPE, UNGTYPE
     USE CONSTANTS, ONLY: LPDLIB
-    use w3odatmd, only : restart_from_binary, use_restartnc, use_historync
     !/
 #ifdef W3_MPI
     INCLUDE "mpif.h"
@@ -2243,7 +2202,6 @@ CONTAINS
 #ifdef W3_MPIT
     CHARACTER(LEN=5)      :: STRING
 #endif
-    logical               :: do_rstsetup
     !/
     !/ ------------------------------------------------------------------- /
     !/
@@ -2267,7 +2225,7 @@ CONTAINS
     IROOT  = NAPFLD - 1
     !
     !
-    IF ((FLOUT(1) .OR. FLOUT(7)) .and. (.not. LPDLIB) .and. (.not. use_historync)) THEN
+    IF ((FLOUT(1) .OR. FLOUT(7)) .and. (.not. LPDLIB)) THEN
       !
       ! NRQMAX is the maximum number of output fields that require MPI communication,
       ! aimed to gather field values stored in each processor into one processor in
@@ -2287,7 +2245,7 @@ CONTAINS
            0                 +    0  +    0  +  &  ! group 3 (extra contributions below)
            2+(NOGE(4)-2)*(NOSWLL+1) +    0  +    0  +  &  ! group 4
            11                +    3  +    1  +  &  ! group 5
-           10                +    7  +    1  +  &  ! group 6 (extra contributions below)
+           12                +    7  +    1  +  &  ! group 6 (extra contributions below)
            5                 +    4  +    1  +  &  ! group 7
            5                 +    2  +    0  +  &  ! group 8
            5                 +    0  +    0  +  &  ! group 9
@@ -2301,7 +2259,6 @@ CONTAINS
       IF ( FLGRDALL( 6,9)) NRQMAX = NRQMAX + P2MSF(3) - P2MSF(2) + 1
       IF ( FLGRDALL( 6, 8) ) NRQMAX = NRQMAX + 2*NK
       IF ( FLGRDALL( 6,12) ) NRQMAX = NRQMAX + 2*NK
-      IF ( FLGRDALL( 6,14) ) NRQMAX = NRQMAX + 2
       !
       IF ( NRQMAX .GT. 0 ) THEN
         ALLOCATE ( OUTPTS(IMOD)%OUT1%IRQGO(NRQMAX) )
@@ -3258,22 +3215,6 @@ CONTAINS
 #ifdef W3_MPI
         END IF
         !
-        IF ( FLGRDALL( 6, 14) ) THEN
-          IH     = IH + 1
-          IT     = IT + 1
-          CALL MPI_SEND_INIT (USSHX (1),NSEALM , MPI_REAL, IROOT,   &
-               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
-#ifdef W3_MPIT
-          WRITE (NDST,9011) IH, ' 6/14', IROOT, IT, IRQGO(IH), IERR
-#endif
-          IH     = IH + 1
-          IT     = IT + 1
-          CALL MPI_SEND_INIT (USSHY (1),NSEALM , MPI_REAL, IROOT,   &
-               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
-#ifdef W3_MPIT
-          WRITE (NDST,9011) IH, ' 6/14', IROOT, IT, IRQGO(IH), IERR
-#endif
-        END IF
         IF ( FLGRDALL( 7, 1) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3457,20 +3398,6 @@ CONTAINS
 #ifdef W3_MPI
         END IF
         !
-        IF ( FLGRDALL( 8, 6) ) THEN
-          IH     = IH + 1
-          IT     = IT + 1
-          CALL MPI_SEND_INIT (QKK  (1),NSEALM , MPI_REAL, IROOT,   &
-               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
-#endif
-#ifdef W3_MPIT
-          WRITE (NDST,9011) IH, ' 8/06', IROOT, IT, IRQGO(IH), IERR
-#endif
-#ifdef W3_MPI
-        END IF
-#endif
-        !
-#ifdef W3_MPI
         IF ( FLGRDALL( 9, 1) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -4521,23 +4448,6 @@ CONTAINS
 #ifdef W3_MPI
           END IF
           !
-          IF ( FLGRDALL( 6, 14) ) THEN
-            IH     = IH + 1
-            IT     = IT + 1
-            CALL MPI_RECV_INIT (USSHX (I0),1,WW3_FIELD_VEC, IFROM, IT,  &
-                 MPI_COMM_WAVE, IRQGO2(IH), IERR )
-#ifdef W3_MPIT
-            WRITE (NDST,9011) IH, ' 6/14', IFROM, IT, IRQGO2(IH), IERR
-#endif
-            IH     = IH + 1
-            IT     = IT + 1
-            CALL MPI_RECV_INIT (USSHY (I0),1,WW3_FIELD_VEC, IFROM, IT,  &
-                 MPI_COMM_WAVE, IRQGO2(IH), IERR )
-#ifdef W3_MPIT
-            WRITE (NDST,9011) IH, ' 6/14', IFROM, IT, IRQGO2(IH), IERR
-#endif
-          END IF
-          !
           IF ( FLGRDALL( 7, 1) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4721,20 +4631,6 @@ CONTAINS
 #ifdef W3_MPI
           END IF
           !
-          IF ( FLGRDALL( 8, 6) ) THEN
-            IH     = IH + 1
-            IT     = IT + 1
-            CALL MPI_RECV_INIT (QKK  (I0),1,WW3_FIELD_VEC, IFROM, IT,  &
-                 MPI_COMM_WAVE, IRQGO2(IH), IERR )
-#endif
-#ifdef W3_MPIT
-            WRITE (NDST,9011) IH, ' 8/06', IFROM, IT, IRQGO2(IH), IERR
-#endif
-#ifdef W3_MPI
-          END IF
-#endif
-          !
-#ifdef W3_MPI
           IF ( FLGRDALL( 9, 1) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4830,7 +4726,7 @@ CONTAINS
         CALL EXTCDE (11)
       END IF
       !
-    END IF ! IF ((FLOUT(1) .OR. FLOUT(7)) .and. (.not. LPDLIB) .and. (.not. use_historync)) THEN
+    END IF ! IF ((FLOUT(1) .OR. FLOUT(7)) .and. (.not. LPDLIB)) THEN
     !
     ! 2.  Set-up for W3IORS ---------------------------------------------- /
     ! 2.a General preparations
@@ -4839,21 +4735,15 @@ CONTAINS
     IH     = 0
     IROOT  = NAPRST - 1
     !
-    if (use_restartnc) then
-      if (restart_from_binary) then
-        do_rstsetup = .true.
-      else
-        do_rstsetup = .false.
-      end if
-    else
-      do_rstsetup = .true.
-    end if
-    !
-    IF ((FLOUT(4) .OR. FLOUT(8)) .and. (.not. LPDLIB) .and. do_rstsetup) THEN
+    IF ((FLOUT(4) .OR. FLOUT(8)) .and. (.not. LPDLIB)) THEN
       IF (OARST) THEN
         ALLOCATE ( OUTPTS(IMOD)%OUT4%IRQRS(34*NAPROC) )
       ELSE
+# ifdef W3_COAWST_MODEL
+        ALLOCATE ( OUTPTS(IMOD)%OUT4%IRQRS(12*NAPROC) )
+# else
         ALLOCATE ( OUTPTS(IMOD)%OUT4%IRQRS(3*NAPROC) )
+# endif
       ENDIF
       IRQRS  => OUTPTS(IMOD)%OUT4%IRQRS
 #endif
@@ -4934,7 +4824,221 @@ CONTAINS
           END IF
         END DO
       END IF
+#endif
       !
+#ifdef W3_COAWST_MODEL
+# ifdef W3_MPI
+      IF ( IAPROC.NE.NAPRST .AND. IAPROC.LE.NAPROC ) THEN
+# endif
+!
+!       CX/Y
+!
+# ifdef W3_MPI
+        IH     = IH + 1
+        IT     = IT0 + 4
+        CALL MPI_SEND_INIT (CX(IAPROC), 1, WW3_FIELD_VEC, &
+             IROOT, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+        WRITE (NDST,9021) IH, 'S CX', IROOT, IT, IRQRS(IH), IERR
+# endif
+!
+# ifdef W3_MPI
+        IH     = IH + 1
+        IT     = IT0 + 5
+        CALL MPI_SEND_INIT (CY(IAPROC), 1, WW3_FIELD_VEC, &
+             IROOT, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+        WRITE (NDST,9021) IH, 'S CY', IROOT, IT, IRQRS(IH), IERR
+# endif
+
+!
+!       TAUOCX/Y
+!
+# ifdef W3_MPI
+        IH     = IH + 1
+        IT     = IT0 + 6
+        CALL MPI_SEND_INIT (TAUOCX(1), NSEALM, MPI_REAL, &
+             IROOT, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+        WRITE (NDST,9021) IH, 'S TX', IROOT, IT, IRQRS(IH), IERR
+# endif
+        !
+# ifdef W3_MPI
+        IH     = IH + 1
+        IT     = IT0 + 7
+        CALL MPI_SEND_INIT (TAUOCY(1), NSEALM, MPI_REAL, &
+             IROOT, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+        WRITE (NDST,9021) IH, 'S TY', IROOT, IT, IRQRS(IH), IERR
+# endif
+!
+!       PHIBRKX/Y
+!
+# ifdef W3_MPI
+        IH     = IH + 1
+        IT     = IT0 + 8
+        CALL MPI_SEND_INIT (PHIBRKX(1), NSEALM, MPI_REAL, &
+             IROOT, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+        WRITE (NDST,9021) IH, 'S PX', IROOT, IT, IRQRS(IH), IERR
+# endif
+        !
+# ifdef W3_MPI
+        IH     = IH + 1
+        IT     = IT0 + 9
+        CALL MPI_SEND_INIT (PHIBRKY(1), NSEALM, MPI_REAL, &
+             IROOT, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+        WRITE (NDST,9021) IH, 'S PY', IROOT, IT, IRQRS(IH), IERR
+# endif
+!
+!       PHICAPX/Y
+!
+# ifdef W3_MPI
+        IH     = IH + 1
+        IT     = IT0 + 10
+        CALL MPI_SEND_INIT (PHICAPX(1), NSEALM, MPI_REAL, &
+             IROOT, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+        WRITE (NDST,9021) IH, 'S WX', IROOT, IT, IRQRS(IH), IERR
+# endif
+        !
+# ifdef W3_MPI
+        IH     = IH + 1
+        IT     = IT0 + 11
+        CALL MPI_SEND_INIT (PHICAPY(1), NSEALM, MPI_REAL, &
+             IROOT, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+        WRITE (NDST,9021) IH, 'S WY', IROOT, IT, IRQRS(IH), IERR
+# endif
+!
+!       PHIBBL
+!
+# ifdef W3_MPI
+        IH     = IH + 1
+        IT     = IT0 + 12
+        CALL MPI_SEND_INIT (PHIBBL(1), NSEALM, MPI_REAL, &
+             IROOT, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+        WRITE (NDST,9021) IH, 'S PB', IROOT, IT, IRQRS(IH), IERR
+# endif
+
+# ifdef W3_MPI
+     ELSE IF ( IAPROC .EQ. NAPRST ) THEN
+!    IF ( IAPROC .EQ. NAPRST ) THEN
+# endif
+        IF (NAPRST .NE. NAPFLD) CALL W3XDMA ( IMOD, NDSE, NDST, FLOGRR )
+        CALL W3XETA ( IMOD, NDSE, NDST )
+        DO I0=1, NAPROC
+          IFROM  = I0 - 1
+          IF ( I0 .NE. IAPROC ) THEN
+            ! CX/Y
+# ifdef W3_MPI
+            IH     = IH + 1
+            IT     = IT0 + 4
+            CALL MPI_RECV_INIT (CX(I0),1,WW3_FIELD_VEC, &
+                 IFROM, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+            WRITE (NDST,9021) IH, 'R CX', IFROM, IT, IRQRS(IH), IERR
+# endif
+            !
+# ifdef W3_MPI
+            IH     = IH + 1
+            IT     = IT0 + 5
+            CALL MPI_RECV_INIT (CY(I0),1,WW3_FIELD_VEC, &
+                 IFROM, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+            WRITE (NDST,9021) IH, 'R CY', IFROM, IT, IRQRS(IH), IERR
+# endif
+            ! TAUOCX/Y
+# ifdef W3_MPI
+            IH     = IH + 1
+            IT     = IT0 + 6
+            CALL MPI_RECV_INIT (TAUOCX(I0),1,WW3_FIELD_VEC, &
+                 IFROM, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+            WRITE (NDST,9021) IH, 'R TX', IFROM, IT, IRQRS(IH), IERR
+# endif
+            !
+# ifdef W3_MPI
+            IH     = IH + 1
+            IT     = IT0 + 7
+            CALL MPI_RECV_INIT (TAUOCY(I0),1,WW3_FIELD_VEC, &
+                 IFROM, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+            WRITE (NDST,9021) IH, 'R TY', IFROM, IT, IRQRS(IH), IERR
+# endif
+            ! PHIBRKX/Y
+# ifdef W3_MPI
+            IH     = IH + 1
+            IT     = IT0 + 8
+            CALL MPI_RECV_INIT (PHIBRKX(I0),1,WW3_FIELD_VEC, &
+                 IFROM, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+            WRITE (NDST,9021) IH, 'R PX', IFROM, IT, IRQRS(IH), IERR
+# endif
+            !
+# ifdef W3_MPI
+            IH     = IH + 1
+            IT     = IT0 + 9
+            CALL MPI_RECV_INIT (PHIBRKY(I0),1,WW3_FIELD_VEC, &
+                 IFROM, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+            WRITE (NDST,9021) IH, 'R PY', IFROM, IT, IRQRS(IH), IERR
+# endif
+            ! PHICAPX/Y
+# ifdef W3_MPI
+            IH     = IH + 1
+            IT     = IT0 + 10
+            CALL MPI_RECV_INIT (PHICAPX(I0),1,WW3_FIELD_VEC, &
+                 IFROM, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+            WRITE (NDST,9021) IH, 'R WX', IFROM, IT, IRQRS(IH), IERR
+# endif
+            !
+# ifdef W3_MPI
+            IH     = IH + 1
+            IT     = IT0 + 11
+            CALL MPI_RECV_INIT (PHICAPY(I0),1,WW3_FIELD_VEC, &
+                 IFROM, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+            WRITE (NDST,9021) IH, 'R WY', IFROM, IT, IRQRS(IH), IERR
+# endif
+            ! PHIBBL
+# ifdef W3_MPI
+            IH     = IH + 1
+            IT     = IT0 + 12
+            CALL MPI_RECV_INIT (PHIBBL(I0),1,WW3_FIELD_VEC, &
+                 IFROM, IT, MPI_COMM_WAVE, IRQRS(IH), IERR )
+# endif
+# ifdef W3_MPIT
+            WRITE (NDST,9021) IH, 'R PB', IFROM, IT, IRQRS(IH), IERR
+# endif
+          END IF
+        END DO
+        CALL W3SETA ( IMOD, NDSE, NDST )
+# ifdef W3_MPI
+      END IF
+# endif
+#endif
+#ifdef W3_MPI
       IF (OARST) THEN
         IF ( FLOGRR( 1, 2) ) THEN
           IH     = IH + 1
@@ -5641,7 +5745,11 @@ CONTAINS
       IF (OARST) THEN
         IT0    = IT0 + 34
       ELSE
+# ifdef W3_COAWST_MODEL
+        IT0    = IT0 + 12
+# else
         IT0    = IT0 + 3
+# endif
       ENDIF
 #endif
       !
@@ -5727,7 +5835,7 @@ CONTAINS
         !
       END IF
       !
-    END IF ! IF ((FLOUT(4) .OR. FLOUT(8)) .and. (.not. LPDLIB) .and. do_rstsetup) THEN
+    END IF ! IF ((FLOUT(4) .OR. FLOUT(8)) .and. (.not. LPDLIB)) THEN
 #endif
     !
     ! 3.  Set-up for W3IOBC ( SENDs ) ------------------------------------ /

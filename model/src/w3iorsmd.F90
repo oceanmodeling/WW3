@@ -62,8 +62,6 @@ MODULE W3IORSMD
   !  7. Source code :
   !
   !/ ------------------------------------------------------------------- /
-  !module default
-  IMPLICIT NONE
   PUBLIC
   !/
   ! Add fields needed for OASIS coupling in restart
@@ -111,7 +109,7 @@ CONTAINS
   !>
   !> @author H. L. Tolman  @date 22-Mar-2021
   !>
-  SUBROUTINE W3IORS ( INXOUT, NDSR, DUMFPI, IMOD, FLRSTRT , filename)
+  SUBROUTINE W3IORS ( INXOUT, NDSR, DUMFPI, IMOD, FLRSTRT )
     !/
     !/                  +-----------------------------------+
     !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -294,19 +292,21 @@ CONTAINS
     !/ ------------------------------------------------------------------- /
     USE W3GDATMD, ONLY: W3SETG, W3SETREF, RSTYPE
     USE W3ODATMD, ONLY: W3SETO
-    USE W3WDATMD, only: W3SETW, W3DIMW
     USE W3ADATMD, ONLY: W3SETA, W3XETA, NSEALM
     USE W3ADATMD, ONLY: CX, CY, HS, WLM, T0M1, T01, FP0, THM, CHARN,&
          TAUWIX, TAUWIY, TWS, TAUOX, TAUOY, BHD,     &
          PHIOC, TUSX, TUSY, USSX, USSY, TAUICE,      &
          UBA, UBD, PHIBBL, TAUBBL, TAUOCX, TAUOCY,   &
          WNMEAN
+#ifdef W3_COAWST_MODEL
+    USE W3ADATMD, ONLY: PHIBRKX, PHIBRKY
+    USE W3ADATMD, ONLY: PHICAPX, PHICAPY
+#endif
     !/
     USE W3GDATMD, ONLY: NX, NY, NSEA, NSEAL, NSPEC, MAPSTA, MAPST2, &
          GNAME, FILEXT, GTYPE, UNGTYPE
     USE W3TRIAMD, ONLY: SET_UG_IOBP
-    USE W3WDATMD, only : DINIT, VA, TIME, TLEV, TICE, TRHO, ICE, UST
-    USE W3WDATMD, only : USTDIR, ASF, FPIS, ICEF, TIC1, TIC5, WLV
+    USE W3WDATMD
 #ifdef W3_WRST
     USE W3IDATMD, ONLY: WXN, WYN, W3SETI
     USE W3IDATMD, ONLY: WXNwrst, WYNwrst
@@ -327,14 +327,14 @@ CONTAINS
 #ifdef W3_TIMINGS
     USE W3PARALL, ONLY: PRINT_MY_TIME
 #endif
-    USE w3odatmd, ONLY : RUNTYPE
-    USE w3adatmd, ONLY : USSHX, USSHY
 #ifdef W3_PDLIB
     USE PDLIB_FIELD_VEC
 #endif
 #ifdef W3_S
     USE W3SERVMD, ONLY: STRACE
 #endif
+    !
+    IMPLICIT NONE
     !
 #ifdef W3_MPI
     INCLUDE "mpif.h"
@@ -349,7 +349,6 @@ CONTAINS
     REAL, INTENT(INOUT)           :: DUMFPI
     CHARACTER, INTENT(IN)         :: INXOUT*(*)
     LOGICAL, INTENT(IN),OPTIONAL  :: FLRSTRT
-    character(len=*), intent(in), optional :: filename
     !/
     !/ ------------------------------------------------------------------- /
     !/ Local parameters
@@ -380,6 +379,7 @@ CONTAINS
     LOGICAL                 :: NDSROPN
     CHARACTER(LEN=4)        :: TYPE
     CHARACTER(LEN=10)       :: VERTST
+    !      CHARACTER(LEN=21)       :: FNAME
     CHARACTER(LEN=40)       :: FNAME
     CHARACTER(LEN=26)       :: IDTST
     CHARACTER(LEN=30)       :: TNAME
@@ -458,57 +458,58 @@ CONTAINS
       ALLOCATE(TMP(NSEA))
       ALLOCATE(TMP2(NSEA))
     ENDIF
+# ifdef W3_COAWST_MODEL
+      ALLOCATE(TMP(NSEA))
+      ALLOCATE(TMP2(NSEA))
+# endif
     !
     ! open file ---------------------------------------------------------- *
     !
-    if (present(filename)) then ! only when restart_nc and restart_from_binary=true
-      open (ndsr,file=trim(filename),form='unformatted', convert=file_endian, &
-           access='stream',err=800,iostat=ierr, status='old',action='read')
-    else
-      I      = LEN_TRIM(FILEXT)
-      J      = LEN_TRIM(FNMPRE)
-      !
-      !CHECKPOINT RESTART FILE
-      ITMP=0
-      IF ( PRESENT(FLRSTRT) ) THEN
-        IF (FLRSTRT) THEN
-          WRITE(TIMETAG,"(i8.8,'.'i6.6)")TIME(1),TIME(2)
-          FNAME=TIMETAG//'.restart.'//FILEXT(:I)
-          ITMP=1
-        END IF
+    I      = LEN_TRIM(FILEXT)
+    J      = LEN_TRIM(FNMPRE)
+    !
+    !CHECKPOINT RESTART FILE
+    ITMP=0
+    IF ( PRESENT(FLRSTRT) ) THEN
+      IF (FLRSTRT) THEN
+        WRITE(TIMETAG,"(i8.8,'.'i6.6)")TIME(1),TIME(2)
+        FNAME=TIMETAG//'.restart.'//FILEXT(:I)
+        ITMP=1
       END IF
-      IF(ITMP.NE.1)THEN ! FNAME is not set above, so do it here
-        IF ( IFILE.EQ.0 ) THEN
-          FNAME  = 'restart.'//FILEXT(:I)
-        ELSE
-          FNAME  = 'restartNNN.'//FILEXT(:I)
-          IF ( WRITE .AND. IAPROC.EQ.NAPRST )                         &
-               WRITE (FNAME(8:10),'(I3.3)') IFILE
-        END IF
-      END IF
-      IFILE  = IFILE + 1
-      !
-#ifdef W3_T
-      WRITE (NDST,9001) FNAME, LRECL
-#endif
-      !
-      IF(NDST.EQ.NDSR)THEN
-        IF ( IAPROC .EQ. NAPERR )                                    &
-             WRITE(NDSE,'(A,I8)')'UNIT NUMBERS OF RESTART FILE AND '&
-             //'TEST OUTPUT ARE THE SAME : ',NDST
-        CALL EXTCDE ( 15 )
-      ENDIF
-
-      IF ( WRITE ) THEN
-        IF ( .NOT.IOSFLG .OR. IAPROC.EQ.NAPRST )                    &
-             OPEN (NDSR,FILE=FNMPRE(:J)//FNAME,form='UNFORMATTED', convert=file_endian,       &
-             ACCESS='STREAM',ERR=800,IOSTAT=IERR)
+    END IF
+    IF(ITMP.NE.1)THEN ! FNAME is not set above, so do it here
+      IF ( IFILE.EQ.0 ) THEN
+        FNAME  = 'restart.'//FILEXT(:I)
       ELSE
-        OPEN (NDSR,FILE=FNMPRE(:J)//FNAME,form='UNFORMATTED', convert=file_endian,       &
-             ACCESS='STREAM',ERR=800,IOSTAT=IERR,                  &
-             STATUS='OLD',ACTION='READ')
+        FNAME  = 'restartNNN.'//FILEXT(:I)
+        IF ( WRITE .AND. IAPROC.EQ.NAPRST )                         &
+             WRITE (FNAME(8:10),'(I3.3)') IFILE
       END IF
-    end if ! if (present(filename))
+    END IF
+
+    IFILE  = IFILE + 1
+    !
+#ifdef W3_T
+    WRITE (NDST,9001) FNAME, LRECL
+#endif
+    !
+
+    IF(NDST.EQ.NDSR)THEN
+      IF ( IAPROC .EQ. NAPERR )                                    &
+           WRITE(NDSE,'(A,I8)')'UNIT NUMBERS OF RESTART FILE AND '&
+           //'TEST OUTPUT ARE THE SAME : ',NDST
+      CALL EXTCDE ( 15 )
+    ENDIF
+
+    IF ( WRITE ) THEN
+      IF ( .NOT.IOSFLG .OR. IAPROC.EQ.NAPRST )                    &
+           OPEN (NDSR,FILE=FNMPRE(:J)//FNAME,form='UNFORMATTED', convert=file_endian,       &
+           ACCESS='STREAM',ERR=800,IOSTAT=IERR)
+    ELSE
+      OPEN (NDSR,FILE=FNMPRE(:J)//FNAME,form='UNFORMATTED', convert=file_endian,       &
+           ACCESS='STREAM',ERR=800,IOSTAT=IERR,                  &
+           STATUS='OLD',ACTION='READ')
+    END IF
     !
     ! test info ---------------------------------------------------------- *
     !
@@ -635,7 +636,6 @@ CONTAINS
         ! Original non-server version writing of spectra
         !
         IF ( .NOT.IOSFLG .OR. (NAPROC.EQ.1.AND.NAPRST.EQ.1) ) THEN
-#ifdef W3_MPI
           DO JSEA=1, NSEAL
             CALL INIT_GET_ISEA(ISEA, JSEA)
             NREC   = ISEA + 2
@@ -644,16 +644,6 @@ CONTAINS
             WRITEBUFF(1:NSPEC) = VA(1:NSPEC,JSEA)
             WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
           END DO
-#else
-          DO JSEA=1, NSEA
-            ISEA = JSEA
-            NREC   = ISEA + 2
-            RPOS  = 1_8 + LRECL*(NREC-1_8)
-            WRITEBUFF(:) = 0.
-            WRITEBUFF(1:NSPEC) = VA(1:NSPEC,JSEA)
-            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
-          END DO
-#endif
           !
           ! I/O server version writing of spectra ( !/MPI )
           !
@@ -803,7 +793,7 @@ CONTAINS
           ELSE
 #endif
             VA = 0.
-            DO JSEA=1, NSEA
+            DO JSEA=1, NSEAL
               CALL INIT_GET_ISEA(ISEA, JSEA)
               NREC   = ISEA + 2
               RPOS   = 1_8 + LRECL*(NREC-1_8)
@@ -930,6 +920,7 @@ CONTAINS
                  (USTDIR(ISEA),ISEA=1+(IPART-1)*NSIZE,       &
                  MIN(NSEA,IPART*NSIZE))
           END DO
+!jcw
           DO IPART=1,NPART
             NREC  = NREC + 1
             RPOS  = 1_8 + LRECL*(NREC-1_8)
@@ -942,10 +933,106 @@ CONTAINS
             NREC  = NREC + 1
             RPOS  = 1_8 + LRECL*(NREC-1_8)
             WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
-            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)         &
-                 (FPIS(ISEA),ISEA=1+(IPART-1)*NSIZE,         &
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)                   &
+                 (FPIS(ISEA),ISEA=1+(IPART-1)*NSIZE,                    &
                  MIN(NSEA,IPART*NSIZE))
           END DO
+
+#ifdef W3_COAWST_MODEL
+# ifdef W3_MPI
+          CALL W3XETA ( IGRD, NDSE, NDST )
+# endif
+!
+!  Write CX/Y into rst file
+!
+          DO IPART=1,NPART
+            NREC  = NREC + 1
+            RPOS  = 1_8 + LRECL*(NREC-1_8)
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)                   &
+                 (CX(ISEA),ISEA=1+(IPART-1)*NSIZE,                      &
+                 MIN(NSEA,IPART*NSIZE))
+          END DO
+          DO IPART=1,NPART
+           NREC  = NREC + 1
+           RPOS  = 1_8 + LRECL*(NREC-1_8)
+           WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
+           WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)                   &
+                (CY(ISEA),ISEA=1+(IPART-1)*NSIZE,                      &
+                MIN(NSEA,IPART*NSIZE))
+          END DO
+!
+!  Write TAUOCX/Y into rst file
+!
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
+          WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)                   &
+               (TAUOCX(ISEA),ISEA=1+(IPART-1)*NSIZE,               &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
+          WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)                   &
+               (TAUOCY(ISEA),ISEA=1+(IPART-1)*NSIZE,               &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+!
+!  Write PHIBRKX/Y into rst file
+!
+          DO IPART=1,NPART
+            NREC  = NREC + 1
+            RPOS  = 1_8 + LRECL*(NREC-1_8)
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)                   &
+                 (PHIBRKX(ISEA),ISEA=1+(IPART-1)*NSIZE,                 &
+                 MIN(NSEA,IPART*NSIZE))
+          END DO
+          DO IPART=1,NPART
+            NREC  = NREC + 1
+            RPOS  = 1_8 + LRECL*(NREC-1_8)
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)                   &
+                 (PHIBRKY(ISEA),ISEA=1+(IPART-1)*NSIZE,                 &
+                   MIN(NSEA,IPART*NSIZE))
+          END DO
+!
+!  Write PHICAPX/Y into rst file
+!
+          DO IPART=1,NPART
+            NREC  = NREC + 1
+            RPOS  = 1_8 + LRECL*(NREC-1_8)
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)                   &
+                 (PHICAPX(ISEA),ISEA=1+(IPART-1)*NSIZE,                &
+                 MIN(NSEA,IPART*NSIZE))
+          END DO
+          DO IPART=1,NPART
+            NREC  = NREC + 1
+            RPOS  = 1_8 + LRECL*(NREC-1_8)
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)                   &
+                 (PHICAPY(ISEA),ISEA=1+(IPART-1)*NSIZE,                &
+                   MIN(NSEA,IPART*NSIZE))
+          END DO
+!
+!  Write PHIBBL into rst file
+!
+          DO IPART=1,NPART
+            NREC  = NREC + 1
+            RPOS  = 1_8 + LRECL*(NREC-1_8)
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR) WRITEBUFF
+            WRITE (NDSR,POS=RPOS,ERR=803,IOSTAT=IERR)                   &
+                 (PHIBBL(ISEA),ISEA=1+(IPART-1)*NSIZE,                  &
+                 MIN(NSEA,IPART*NSIZE))
+          END DO
+# ifdef W3_MPI
+          CALL W3SETA ( IGRD, NDSE, NDST )
+# endif
+#endif
           IF (OARST) THEN
 #ifdef W3_MPI
             CALL W3XETA ( IGRD, NDSE, NDST )
@@ -1002,10 +1089,6 @@ CONTAINS
             IF ( FLOGRR(6,13) ) THEN
               WRITE(NDSR,ERR=803,IOSTAT=IERR) TAUOCX(1:NSEA)
               WRITE(NDSR,ERR=803,IOSTAT=IERR) TAUOCY(1:NSEA)
-            ENDIF
-            IF ( FLOGRR(6,14) ) THEN
-              WRITE(NDSR,ERR=803,IOSTAT=IERR) USSHX(1:NSEA)
-              WRITE(NDSR,ERR=803,IOSTAT=IERR) USSHY(1:NSEA)
             ENDIF
             IF ( FLOGRR(7,2) ) THEN
               WRITE(NDSR,ERR=803,IOSTAT=IERR) UBA(1:NSEA)
@@ -1089,6 +1172,7 @@ CONTAINS
         ! Updates reflections maps:
         !
         IF (GTYPE.EQ.UNGTYPE) THEN
+          !AR: not needed since already initialized on w3iogr                CALL SET_UG_IOBP
 #ifdef W3_REF1
         ELSE
           CALL W3SETREF
@@ -1109,6 +1193,7 @@ CONTAINS
                (USTDIR(ISEA),ISEA=1+(IPART-1)*NSIZE,           &
                MIN(NSEA,IPART*NSIZE))
         END DO
+!jcw
         DO IPART=1,NPART
           NREC  = NREC + 1
           RPOS  = 1_8 + LRECL*(NREC-1_8)
@@ -1123,6 +1208,121 @@ CONTAINS
                (FPIS(ISEA),ISEA=1+(IPART-1)*NSIZE,             &
                MIN(NSEA,IPART*NSIZE))
         END DO
+#ifdef W3_COAWST_MODEL
+!
+!  Read CX/Y from rst file
+!
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          READ (NDSR,POS=RPOS,ERR=802,IOSTAT=IERR)                      &
+               (CX(ISEA),ISEA=1+(IPART-1)*NSIZE,                        &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          READ (NDSR,POS=RPOS,ERR=802,IOSTAT=IERR)                      &
+               (CY(ISEA),ISEA=1+(IPART-1)*NSIZE,                        &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+!
+!  Read TAUOCX/Y from rst file
+!
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          READ (NDSR,POS=RPOS,ERR=802,IOSTAT=IERR)                      &
+               (TMP(ISEA),ISEA=1+(IPART-1)*NSIZE,                    &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          READ (NDSR,POS=RPOS,ERR=802,IOSTAT=IERR)                      &
+               (TMP2(ISEA),ISEA=1+(IPART-1)*NSIZE,                    &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+        TAUOCX = 0.
+        TAUOCY = 0.
+        DO I=1, NSEALM
+          J = IAPROC + (I-1)*NAPROC
+          IF (J .LE. NSEA) THEN
+            TAUOCX(I) = TMP(J)
+            TAUOCY(I) = TMP2(J)
+          ENDIF
+        ENDDO
+!
+!  Read PHIBRKX/Y from rst file
+!
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          READ (NDSR,POS=RPOS,ERR=802,IOSTAT=IERR)                      &
+               (TMP(ISEA),ISEA=1+(IPART-1)*NSIZE,                   &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          READ (NDSR,POS=RPOS,ERR=802,IOSTAT=IERR)                      &
+               (TMP2(ISEA),ISEA=1+(IPART-1)*NSIZE,                   &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+        PHIBRKX = 0.
+        PHIBRKY = 0.
+        DO I=1, NSEALM
+          J = IAPROC + (I-1)*NAPROC
+          IF (J .LE. NSEA) THEN
+            PHIBRKX(I) = TMP(J)
+            PHIBRKY(I) = TMP2(J)
+          ENDIF
+        ENDDO
+!
+!  Read PHICAPX/Y from rst file
+!
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          READ (NDSR,POS=RPOS,ERR=802,IOSTAT=IERR)                      &
+               (TMP(ISEA),ISEA=1+(IPART-1)*NSIZE,                   &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          READ (NDSR,POS=RPOS,ERR=802,IOSTAT=IERR)                      &
+               (TMP2(ISEA),ISEA=1+(IPART-1)*NSIZE,                   &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+        PHICAPX = 0.
+        PHICAPY = 0.
+        DO I=1, NSEALM
+          J = IAPROC + (I-1)*NAPROC
+          IF (J .LE. NSEA) THEN
+            PHICAPX(I) = TMP(J)
+            PHICAPY(I) = TMP2(J)
+          ENDIF
+        ENDDO
+!
+!  Read PHIBBL from rst file
+!
+        DO IPART=1,NPART
+          NREC  = NREC + 1
+          RPOS  = 1_8 + LRECL*(NREC-1_8)
+          READ (NDSR,POS=RPOS,ERR=802,IOSTAT=IERR)                      &
+               (TMP(ISEA),ISEA=1+(IPART-1)*NSIZE,                    &
+               MIN(NSEA,IPART*NSIZE))
+        END DO
+        PHIBBL = 0.
+        DO I=1, NSEALM
+          J = IAPROC + (I-1)*NAPROC
+          IF (J .LE. NSEA) THEN
+            PHIBBL(I) = TMP(J)
+          ENDIF
+        ENDDO
+
+#endif
         IF (OARST) THEN
           IF ( FLOGOA(1,2) ) THEN
             READ (NDSR,ERR=802,IOSTAT=IERR) CX(1:NSEA)
@@ -1274,17 +1474,6 @@ CONTAINS
               ENDIF
             ENDDO
           ENDIF
-          IF ( FLOGOA(6,14) ) THEN
-            READ (NDSR,ERR=802,IOSTAT=IERR) TMP(1:NSEA)
-            READ (NDSR,ERR=802,IOSTAT=IERR) TMP2(1:NSEA)
-            DO I=1, NSEALM
-              J = IAPROC + (I-1)*NAPROC
-              IF (J .LE. NSEA) THEN
-                USSHX(I) = TMP(J)
-                USSHY(I) = TMP2(J)
-              ENDIF
-            ENDDO
-          ENDIF
           IF ( FLOGOA(7,2) ) THEN
             READ (NDSR,ERR=802,IOSTAT=IERR) TMP(1:NSEA)
             READ (NDSR,ERR=802,IOSTAT=IERR) TMP2(1:NSEA)
@@ -1324,7 +1513,6 @@ CONTAINS
         TICE(1) = -1
         TICE(2) =  0
         TRHO(1) = -1
-        TRHO(2) =  0
         TIC1(1) = -1
         TIC1(2) =  0
         TIC5(1) = -1
@@ -1369,8 +1557,6 @@ CONTAINS
           UBD     = 0.
           PHIBBL  = 0.
           TAUBBL  = 0.
-          USSHX   = 0.
-          USSHY   = 0.
         ENDIF
 #ifdef W3_T
         WRITE (NDST,9008)

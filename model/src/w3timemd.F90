@@ -72,9 +72,6 @@ MODULE W3TIMEMD
   USE W3SERVMD, ONLY: STRACE
 #endif
   !
-  ! module default
-  implicit none
-
   PUBLIC
   !
   INTEGER, PRIVATE        :: PRFTB(8)
@@ -133,6 +130,8 @@ CONTAINS
     ! 10. Source code :
     !
     !/ ------------------------------------------------------------------- /
+    !/
+    IMPLICIT NONE
     !/
     !/ ------------------------------------------------------------------- /
     !/ Parameter list
@@ -245,6 +244,7 @@ CONTAINS
       !
       !/ ------------------------------------------------------------------- /
       !/
+      IMPLICIT NONE
       !/
       !/ ------------------------------------------------------------------- /
       !/ Parameter list
@@ -383,6 +383,7 @@ CONTAINS
     !
     !/ ------------------------------------------------------------------- /
     !/
+    IMPLICIT NONE
     !/
     !/ ------------------------------------------------------------------- /
     !/ Parameter list
@@ -504,6 +505,7 @@ CONTAINS
       !
       !/ ------------------------------------------------------------------- /
       !/
+      IMPLICIT NONE
       !/
       !/ ------------------------------------------------------------------- /
       !/ Parameter list
@@ -632,6 +634,7 @@ CONTAINS
     !
     !/ ------------------------------------------------------------------- /
     !/
+    IMPLICIT NONE
     !/
     !/ ------------------------------------------------------------------- /
     !/ Parameter list
@@ -711,6 +714,7 @@ CONTAINS
     !
     !/ ------------------------------------------------------------------- /
     !/
+    IMPLICIT NONE
     !/
     !/ ------------------------------------------------------------------- /
     !/ Parameter list
@@ -761,6 +765,7 @@ CONTAINS
     !
     !/ ------------------------------------------------------------------- /
     !/
+    IMPLICIT NONE
     !/
     !/ ------------------------------------------------------------------- /
     INTEGER(KIND=4),    INTENT(in)  :: id,mm,iyyy
@@ -2012,27 +2017,7 @@ CONTAINS
     !/ End of T2ISO ------------------------------------------------------ /
     !/
   END SUBROUTINE T2ISO
-  !> Create a timestring for custom user filenames
-  !! @details Creates a character string of form YYYY-MM-DD-SSSSS
-  !! @param[in]   time(2)            YYYYMMDD HHMMSS
-  !! @param[out]  user_timestring    YYYY-MM-DD-SSSSS
-  !> @author mvertens@ucar.edu, Denise.Worthen@noaa.gov
-  !> @date 01-05-2022
-  subroutine set_user_timestring(time, user_timestring)
-    integer          , intent(in)  :: time(2)
-    character(len=16), intent(out) :: user_timestring
 
-    ! local variables
-    integer :: yy,mm,dd,hh,mn,ss,totsec
-    yy =  time(1)/10000
-    mm = (time(1)-yy*10000)/100
-    dd = (time(1)-yy*10000-mm*100)
-    hh = time(2)/10000
-    mn = (time(2)-hh*10000)/100
-    ss = (time(2)-hh*10000-mn*100)
-    totsec = hh*3600+mn*60+ss
-    write(user_timestring,'(i4.4,a,i2.2,a,i2.2,a,i5.5)')yy,'-',mm,'-',dd,'-',totsec
-  end subroutine set_user_timestring
   !/ End of module W3TIMEMD -------------------------------------------- /
   !/
 END MODULE W3TIMEMD

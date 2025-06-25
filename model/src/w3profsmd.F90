@@ -137,6 +137,9 @@ CONTAINS
          FSN, FSPSI, FSFCT, FSNIMP, GTYPE, UNGTYPE
 
     USE W3WDATMD, ONLY: TIME
+#ifdef W3_CURSP
+    USE W3ADATMD, ONLY: CXTH, CYTH
+#endif
     USE W3ODATMD, ONLY: TBPI0, TBPIN, FLBPI
     USE W3ADATMD, ONLY: CG, CX, CY, ATRNX, ATRNY, ITIME, CFLXYMAX, DW
     USE W3IDATMD, ONLY: FLCUR
@@ -159,7 +162,7 @@ CONTAINS
     !/ Local parameters
     !/
     INTEGER                 :: ITH, IK, ISEA, IXY
-    INTEGER                 :: IX
+    INTEGER                 :: IX, ISPC
 #ifdef W3_S
     INTEGER, SAVE           :: IENT = 0
 #endif
@@ -218,8 +221,13 @@ CONTAINS
         ! Currents are not included on coastal boundaries (IOBP(IXY).EQ.0)
         !
         IF (IOBP(IXY) .EQ. 1) THEN
+#ifdef W3_CURSP
+          VLCFLX(IXY) = VLCFLX(IXY) + CCURX*CXTH(ISEA,IK)/CLATS(ISEA)
+          VLCFLY(IXY) = VLCFLY(IXY) + CCURY*CYTH(ISEA,IK)
+#else
           VLCFLX(IXY) = VLCFLX(IXY) + CCURX*CX(ISEA)/CLATS(ISEA)
           VLCFLY(IXY) = VLCFLY(IXY) + CCURY*CY(ISEA)
+#endif
         END IF
       END DO
     END IF
@@ -1266,7 +1274,7 @@ CONTAINS
       DO IBI=1, NBI
         IP    = MAPSF(ISBPI(IBI),1)
         AC(IP) = ( RD1*BBPI0(ISP,IBI) + RD2*BBPIN(ISP,IBI) )   &
-             *IOBPA(IP)*IOBPD(ITH,IP) / CG(IK,ISBPI(IBI)) * CLATS(ISBPI(IBI))
+             *IOBPA(IP)*(1-IOBPD(ITH,IP)) / CG(IK,ISBPI(IBI)) * CLATS(ISBPI(IBI))
       END DO
     END IF
 

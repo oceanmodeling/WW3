@@ -589,6 +589,9 @@ CONTAINS
     USE W3WDATMD, ONLY: TIME, ASF
     USE W3ADATMD, ONLY: DW, CX, CY, UA, UD, U10, U10D, AS,          &
          UA0, UAI, UD0, UDI, AS0, ASI
+#ifdef W3_CURSP
+    USE W3ADATMD, ONLY: CXTH, CYTH
+#endif
     USE W3IDATMD, ONLY: TW0, WX0, WY0, DT0, TWN, WXN, WYN, DTN, FLCUR
     !/
     IMPLICIT NONE
@@ -696,6 +699,8 @@ CONTAINS
     !
     DO ISEA=1, NSEA
       !
+#ifdef W3_AIR_WAVES
+#else
       UA(ISEA) = UA0(ISEA) + RD * UAI(ISEA)
 #ifdef W3_WNT2
       UI2      = SQRT ( RD2 *      UA0(ISEA)**2 +             &
@@ -703,6 +708,7 @@ CONTAINS
       UA(ISEA) = UA(ISEA) * MIN(1.25,UI2/MAX(1.E-7,UA(ISEA)))
 #endif
       UD(ISEA) = UD0(ISEA) + RD * UDI(ISEA)
+#endif
 #ifdef W3_MGW
       UXR        = UA(ISEA)*COS(UD(ISEA)) + VGX
       UYR        = UA(ISEA)*SIN(UD(ISEA)) + VGY
@@ -741,8 +747,13 @@ CONTAINS
       !
 #ifdef W3_RWND
       DO ISEA=1, NSEA
+#ifdef W3_CURSP
+        UXR        = UA(ISEA)*COS(UD(ISEA)) - RWINDC*CXTH(ISEA,1)
+        UYR        = UA(ISEA)*SIN(UD(ISEA)) - RWINDC*CYTH(ISEA,1)
+#else
         UXR        = UA(ISEA)*COS(UD(ISEA)) - RWINDC*CX(ISEA)
         UYR        = UA(ISEA)*SIN(UD(ISEA)) - RWINDC*CY(ISEA)
+#endif
         U10 (ISEA) = MAX ( 0.001 , SQRT(UXR**2+UYR**2) )
         U10D(ISEA) = MOD ( TPI+ATAN2(UYR,UXR) , TPI )
       END DO

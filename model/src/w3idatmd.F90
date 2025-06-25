@@ -94,8 +94,6 @@ MODULE W3IDATMD
   !      FLCUR     Log.  Public   Flag for current input.
   !      FLWIND    Log.  Public   Flag for wind input.
   !      FLICE     Log.  Public   Flag for ice input.
-  !      HSL       R.A.  Public   Depth of a surface layer over which Stokes
-  !                               drift is averaged
   !      FLTAUA    Log.  Public   Flag for atmospheric momentum input
   !      FLRHOA    Log.  Public   Flag for air density input
   !      INFLAGS1  L.A.  Public   Array consolidating the above six
@@ -218,7 +216,6 @@ MODULE W3IDATMD
     REAL, POINTER         :: CYTIDE(:,:,:,:)
     REAL, POINTER         :: WLTIDE(:,:,:,:)
 #endif
-    REAL, POINTER         :: HSL(:,:)
     LOGICAL               :: IINIT
 #ifdef W3_WRST
     LOGICAL               :: WRSTIINIT=.FALSE.
@@ -269,7 +266,6 @@ MODULE W3IDATMD
   LOGICAL, POINTER        ::  FLLEVTIDE, FLCURTIDE,  &
        FLLEVRESI, FLCURRESI
 #endif
-  REAL , POINTER :: HSL(:,:)
   !/
 CONTAINS
   !/ ------------------------------------------------------------------- /
@@ -738,9 +734,6 @@ CONTAINS
       CHECK_ALLOC_STATUS ( ISTAT )
     END IF
     !
-    ALLOCATE ( INPUTS(IMOD)%HSL(NX,NY), STAT=ISTAT )
-    CHECK_ALLOC_STATUS ( ISTAT )
-    !
     INPUTS(IMOD)%IINIT  = .TRUE.
     !
 #ifdef W3_T
@@ -1054,7 +1047,6 @@ CONTAINS
         ICEI   => INPUTS(IMOD)%ICEI
         BERGI  => INPUTS(IMOD)%BERGI
       END IF
-      HSL => INPUTS(IMOD)%HSL
       !
       IF ( FLTAUA  ) THEN
         UX0    => INPUTS(IMOD)%UX0

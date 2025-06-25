@@ -299,8 +299,7 @@ PROGRAM W3PRNC
   REAL, ALLOCATABLE       :: XC(:,:), YC(:,:), AC(:,:),           &
        DATA(:,:), XTEMP(:,:)
   !
-  REAL, ALLOCATABLE, TARGET :: ALA(:,:), ALO(:,:)
-  REAL, POINTER           :: PTR_ALA(:,:), PTR_ALO(:,:)
+  REAL, POINTER           :: ALA(:,:), ALO(:,:)
   !
   DOUBLE PRECISION        :: REFJULDAY, CURJULDAY, STARTJULDAY, STPJULDAY
   !
@@ -1008,9 +1007,7 @@ PROGRAM W3PRNC
       !
       ! ... create grid search utility
       !
-      PTR_ALA => ALA
-      PTR_ALO => ALO
-      GSI = W3GSUC( .TRUE., FLAGLL, ICLO, PTR_ALO, PTR_ALA )
+      GSI = W3GSUC( .TRUE., FLAGLL, ICLO, ALO, ALA )
       !
       ! ... construct Interpolation data
       !
@@ -1213,9 +1210,9 @@ PROGRAM W3PRNC
         !
         ! ... read lat-lon data
         !
-        IF ( ALLOCATED(ALA) ) THEN
+        IF ( ASSOCIATED(ALA) ) THEN
           DEALLOCATE ( ALA, ALO )
-          NULLIFY ( PTR_ALA, PTR_ALO )
+          NULLIFY ( ALA, ALO )
         END IF
         ALLOCATE ( ALA(NXJ(J),NYJ(J)), ALO(NXJ(J),NYJ(J)) )
         CALL INA2R (ALA, NXJ(J), NYJ(J), 1, NXJ(J), 1, NYJ(J),&
@@ -2224,7 +2221,7 @@ PROGRAM W3PRNC
   END DO ! NTI
   !
   DEALLOCATE(XC,YC,AC,XTEMP)
-  IF (ALLOCATED(ALA)) DEALLOCATE(ALA,ALO)
+  IF (ASSOCIATED(ALA)) DEALLOCATE(ALA,ALO)
   !
   !     End loop over input fields
   !--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
