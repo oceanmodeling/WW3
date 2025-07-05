@@ -969,9 +969,9 @@ CONTAINS
       if (runtype == 'continue' )then
         call set_user_timestring(time,user_timestring)
         if (restart_from_binary) then
-          fname = trim(FNMRST)//trim(user_restfname)//trim(user_timestring)
+          fname = trim(user_restfname)//trim(user_timestring)
         else
-          fname = trim(FNMRST)//trim(user_restfname)//trim(user_timestring)//'.nc'
+          fname = trim(user_restfname)//trim(user_timestring)//'.nc'
         endif
         inquire(file=trim(fname), exist=exists)
         if (exists) then
@@ -986,12 +986,12 @@ CONTAINS
       else
         if (restart_from_binary) then
           call set_user_timestring(time,user_timestring)
-          fname = trim(FNMRST)//trim(user_restfname)//trim(user_timestring)
+          fname = trim(user_restfname)//trim(user_timestring)
           inquire(file=trim(fname), exist=exists)
           if (exists) then
             call w3iors('READ', nds(6), sig(nk), imod, filename=trim(fname))
           else
-            call extcde (60, msg="required restart file " // trim(fname) // " does not exist") 
+            call extcde (60, msg="required restart file " // trim(fname) // " does not exist")
           end if
         else
           call read_restart('none')
@@ -1291,11 +1291,11 @@ CONTAINS
     !
     ! 4.d Preprocessing for point output.
     !
-#ifdef W3_MPI    
+#ifdef W3_MPI
     IF ( FLOUT(2) ) CALL W3IOPP ( NPT, XPT, YPT, PNAMES, IMOD, MPI_COMM_WAVE )
-#else 
+#else
     IF ( FLOUT(2) ) CALL W3IOPP ( NPT, XPT, YPT, PNAMES, IMOD, 1 )
-#endif 
+#endif
 #ifdef W3_PDLIB
     CALL DEALLOCATE_PDLIB_GLOBAL(IMOD)
 #endif
