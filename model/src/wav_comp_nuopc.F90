@@ -393,7 +393,7 @@ contains
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
     if (isPresent .and. isSet) runtimelog=(trim(cvalue)=="true")
     write(logmsg,*) runtimelog
-    call ESMF_LogWrite(trim(subname)//': RunTimeLog = '//trim(logmsg), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('WW3_cap:RunTimeLog = '//trim(logmsg), ESMF_LOGMSG_INFO)
     if (runtimelog) then
       call ufs_file_setLogUnit('./log.ww3.timer',nu_timer,runtimelog)
     end if

@@ -418,7 +418,7 @@ contains
         end if
       else
         if (standalone) then
-           call ESMF_LogWrite(trim(subname)//' no connected uwnd field. reading data from wind.ww3.', ESMF_LOGMSG_INFO)
+           call ESMF_LogWrite(trim(subname)//' standalone run. reading atm u wind data from wind.ww3', ESMF_LOGMSG_INFO)
            call FillGlobalInput(wxdata, WX0)
            call FillGlobalInput(wxdata, WXN)
         end if
@@ -442,7 +442,7 @@ contains
         end if
       else
         if (standalone) then
-           call ESMF_LogWrite(trim(subname)//' no connected vwnd field. reading data from wind.ww3.', ESMF_LOGMSG_INFO)
+           call ESMF_LogWrite(trim(subname)//' standalone run. reading atm v wind data from wind.ww3', ESMF_LOGMSG_INFO)
            call FillGlobalInput(wydata, WY0)
            call FillGlobalInput(wydata, WYN)
         end if
