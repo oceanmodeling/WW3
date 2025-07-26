@@ -595,6 +595,7 @@ MODULE W3ODATMD
   character(len=36)  :: calendar_name = ''             !< @public the calendar used for netCDF output
   integer(kind=8)    :: elapsed_secs = 0               !< @public the time in seconds from the time_origin
   logical            :: use_cmeps = .false.            !< @public a logical flag to indicate cmeps is providing the forcing
+  logical            :: standalone = .false.           !< @public logical to control whether wave model is run standalone
   !/
 CONTAINS
   !/ ------------------------------------------------------------------- /

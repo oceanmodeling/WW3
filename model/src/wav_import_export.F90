@@ -20,7 +20,7 @@ module wav_import_export
   use wav_shr_mod  , only : chkerr
   use wav_shr_mod  , only : state_diagnose, state_reset, state_getfldptr, state_fldchk
   use wav_shr_mod  , only : wav_coupling_to_cice, nwav_elev_spectrum, merge_import, dbug_flag, unstr_mesh
-  use wav_shr_mod  , only : standalone
+  use w3odatmd     , only : standalone
   use constants    , only : grav, tpi, dwat, dair
   use w3parall     , only : init_get_isea
 
@@ -244,7 +244,7 @@ contains
     call state_reset(ImportState, zero, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    if (dbug_flag > 5) then
+    if (.not. standalone .and. dbug_flag > 5) then
       call state_diagnose(exportState, 'after state_reset', rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
@@ -320,7 +320,7 @@ contains
     call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, vm=vm, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    if (dbug_flag > 5) then
+    if (.not. standalone .and. dbug_flag > 5) then
       call state_diagnose(importState, 'at import ', rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
@@ -867,7 +867,7 @@ contains
       enddo
     end if
 
-    if (dbug_flag > 5) then
+    if (.not. standalone .and. dbug_flag > 5) then
       call state_diagnose(exportState, 'at export ', rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end if

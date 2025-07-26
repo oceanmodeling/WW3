@@ -74,7 +74,6 @@ module wav_shr_mod
 
   ! Only used by ufs
   logical            , public :: merge_import  = .false.  !< @public logical to specify whether import fields will
-  logical            , public :: standalone = .false.     !< @public logical to control whether wave model is run
   interface ymd2date
     module procedure ymd2date_int
     module procedure ymd2date_long

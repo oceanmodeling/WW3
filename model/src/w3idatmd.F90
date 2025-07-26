@@ -507,7 +507,7 @@ CONTAINS
 #ifdef W3_S
     USE W3SERVMD,  ONLY: STRACE
 #endif
-    use w3odatmd, only : use_cmeps
+    use w3odatmd, only : use_cmeps, standalone
     !
     IMPLICIT NONE
     !/
@@ -633,7 +633,7 @@ CONTAINS
       CHECK_ALLOC_STATUS ( ISTAT )
     END IF
     !
-    if (use_cmeps) then
+    if (.not. standalone .and. use_cmeps) then
        allocsizex = 1
        allocsizey = 1
     else

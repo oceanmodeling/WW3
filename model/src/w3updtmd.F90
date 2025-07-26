@@ -150,7 +150,7 @@ MODULE W3UPDTMD
   USE W3SERVMD, ONLY : STRACE
 #endif
   USE W3TIMEMD, ONLY : DSEC21
-  use w3odatmd, only : use_cmeps
+  use w3odatmd, only : use_cmeps, standalone
   ! used/reused in module
   real :: mag, dir
   !/
@@ -292,7 +292,7 @@ CONTAINS
 #ifdef W3_S
     CALL STRACE (IENT, 'W3UCUR')
 #endif
-    if (use_cmeps) then
+    if (.not. standalone .and. use_cmeps) then
       do isea = 1,nsea
         ix = mapsf(isea,1)
         iy = mapsf(isea,2)
@@ -475,7 +475,7 @@ CONTAINS
 #endif
         !
       END DO
-    end if ! use_cmeps
+    end if ! use_cmeps & standalone
     !
     RETURN
     !

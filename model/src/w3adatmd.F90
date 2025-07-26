@@ -940,7 +940,7 @@ CONTAINS
 #ifdef W3_S
     USE W3SERVMD, ONLY: STRACE
 #endif
-    use w3odatmd, only : use_cmeps
+    use w3odatmd, only : use_cmeps, standalone
     !
     !/
     !/ ------------------------------------------------------------------- /
@@ -1343,7 +1343,7 @@ CONTAINS
       ALLOCATE (WADATS(IMOD)%IC3CG(0:NK+1,0:300), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
 #endif
-      if (use_cmeps) then
+      if (.not. standalone .and. use_cmeps) then
          allocsize = 1
       else
          allocsize = nsea

@@ -47,7 +47,7 @@ module wav_comp_nuopc
   use w3odatmd              , only : runtype, user_histfname, user_restfname, verboselog
   use w3odatmd              , only : use_historync, use_restartnc, restart_from_binary, logfile_is_assigned
   use w3odatmd              , only : time_origin, calendar_name, elapsed_secs
-  use wav_shr_mod           , only : casename, inst_suffix, inst_index, unstr_mesh, standalone
+  use wav_shr_mod           , only : casename, inst_suffix, inst_index, unstr_mesh
   use wav_wrapper_mod       , only : ufs_settimer, ufs_logtimer, ufs_file_setlogunit, wtime
 #ifndef W3_CESMCOUPLED
   use shr_is_restart_fh_mod , only : init_is_restart_fh, is_restart_fh, is_restart_fh_type
@@ -214,7 +214,7 @@ contains
   !> @date 01-05-2022
   subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
 
-    use w3odatmd        , only : use_cmeps
+    use w3odatmd        , only : use_cmeps, standalone
     use w3adatmd        , only : w3naux, w3seta
     use w3idatmd        , only : w3seti, w3ninp
     use w3gdatmd        , only : w3nmod, w3setg
@@ -268,7 +268,7 @@ contains
     call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
 
     ! if we're here, then cmeps is active
-    use_cmeps = .true.
+    if (.not. standalone) use_cmeps = .true.
 
     !----------------------------------------------------------------------------
     ! retrieve configuration settings
@@ -952,6 +952,7 @@ contains
 
     use wav_import_export, only : calcRoughl
     use w3gdatmd         , only : nx, ny
+    use w3odatmd         , only : standalone
 
     ! input/output variables
     type(ESMF_GridComp)  :: gcomp
@@ -1016,7 +1017,7 @@ contains
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
-    if ( dbug_flag > 5) then
+    if (.not. standalone .and. dbug_flag > 5) then
       call state_diagnose(exportState, 'at DataInitialize ', rc=rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
