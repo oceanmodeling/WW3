@@ -71,6 +71,7 @@ MODULE W3INITMD
   !/    25-Sep-2020 : Extra fields for coupling restart   ( version 7.10 )
   !/    22-Mar-2021 : Extra coupling fields               ( version 7.13 )
   !/    22-Jun-2021 : GKE NL5 (Q. Liu)                    ( version 7.13 )
+  !/    04-Jul-2025 : Remove labelled statements          ( version X.XX )
   !/
   !/    Copyright 2009-2013 National Weather Service (NWS),
   !/       National Oceanic and Atmospheric Administration.  All rights
@@ -154,13 +155,13 @@ CONTAINS
   !> @param[in] PNAMES        Output point names.
   !> @param[in] IPRT          Partitioning grid info.
   !> @param[inout] PRTFRM     Partitioning format flag.
-  !> @param[in] MPI_COMM      MPI communicator to be used for model.
+  !> @param[in] MPI_COMM_IN   MPI communicator to be used for model.
   !> @param[in] FLAGSTIDEIN
   !>
   !> @author H. L. Tolman  @date 03-Sep-2012
   !>
   SUBROUTINE W3INIT ( IMOD, IsMulti, FEXT, MDS, MTRACE, ODAT, FLGRD,  FLGR2, FLGD, &
-       FLG2, NPT, XPT, YPT, PNAMES, IPRT, PRTFRM, MPI_COMM, FLAGSTIDEIN)
+       FLG2, NPT, XPT, YPT, PNAMES, IPRT, PRTFRM, MPI_COMM_IN, FLAGSTIDEIN)
     !/
     !/                  +-----------------------------------+
     !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -283,6 +284,7 @@ CONTAINS
     !      W3DMO5    Subr.   Id.    Set array sizes in data structure.
     !      ITRACE    Subr. W3SERVMD Subroutine tracing initialization.
     !      STRACE    Subr.   Id.    Subroutine tracing.
+    !      EXTOPN    Subr.   Id.    Program abort if open file fails.
     !      EXTCDE    Subr.   Id.    Program abort.
     !      WWDATE    Subr.   Id.    System date.
     !      WWTIME    Subr.   Id.    System time.
@@ -379,7 +381,7 @@ CONTAINS
     USE W3IOGRMD, ONLY: W3IOGR
     USE W3IORSMD, ONLY: W3IORS
     USE W3IOPOMD, ONLY: W3IOPP
-    USE W3SERVMD, ONLY: ITRACE, EXTCDE, WWDATE, WWTIME
+    USE W3SERVMD, ONLY: ITRACE, EXTCDE, EXTOPN, WWDATE, WWTIME
 #ifdef W3_S
     USE W3SERVMD, ONLY: STRACE
 #endif
@@ -456,15 +458,19 @@ CONTAINS
 #endif
     !/
 #ifdef W3_MPI
-    INCLUDE "mpif.h"
+    use mpi_f08
 #endif
     !/
     !/ ------------------------------------------------------------------- /
     !/ Parameter list
     !/
     INTEGER, INTENT(IN)           :: IMOD, MDS(15), MTRACE(2),      &
-         ODAT(40),NPT, IPRT(6),&
-         MPI_COMM
+         ODAT(40),NPT, IPRT(6)
+#ifdef W3_MPI
+    type(MPI_COMM), INTENT(IN)    :: MPI_COMM_IN
+#else
+    INTEGER, INTENT(IN)           :: MPI_COMM_IN
+#endif
     LOGICAL, INTENT(IN)           :: IsMulti
     REAL, INTENT(INOUT)           :: XPT(NPT), YPT(NPT)
     LOGICAL, INTENT(INOUT)        :: FLGRD(NOGRP,NGRPP), FLGD(NOGRP),&
@@ -487,7 +493,8 @@ CONTAINS
     INTEGER                 :: ISTEP, ISP, IW
 #endif
 #ifdef W3_MPI
-    INTEGER                 :: IERR_MPI, BGROUP, LGROUP
+    INTEGER                 :: IERR_MPI
+    type(MPI_GROUP)         :: BGROUP, LGROUP
 #endif
 #ifdef W3_S
     INTEGER, SAVE           :: IENT = 0
@@ -571,7 +578,7 @@ CONTAINS
 #endif
     !
 #ifdef W3_MPI
-    MPI_COMM_WAVE = MPI_COMM
+    MPI_COMM_WAVE = MPI_COMM_IN
     CALL MPI_COMM_SIZE ( MPI_COMM_WAVE, NTPROC, IERR_MPI )
     NAPROC = NTPROC
     CALL MPI_COMM_RANK ( MPI_COMM_WAVE, IAPROC, IERR_MPI )
@@ -688,13 +695,17 @@ CONTAINS
       IFT    = LEN_TRIM(TFILE)
       J      = LEN_TRIM(FNMPRE)
       !
-      IF ( OUTPTS(IMOD)%IAPROC .EQ. OUTPTS(IMOD)%NAPLOG )             &
-           OPEN (MDS(1),FILE=FNMPRE(:J)//LFILE(:IFL),ERR=888,IOSTAT=IERR)
+      IF ( OUTPTS(IMOD)%IAPROC .EQ. OUTPTS(IMOD)%NAPLOG ) THEN
+        OPEN (MDS(1), FILE=FNMPRE(:J)//LFILE(:IFL),IOSTAT=IERR)
+        IF (IERR.NE.0) CALL EXTOPN(NDSE,IERR,'W3INIT','LOG',1)
+      END IF
       !
       IF ( MDS(3).NE.MDS(1) .AND. MDS(3).NE.MDS(4) .AND. TSTOUT ) THEN
         INQUIRE (MDS(3),OPENED=OPENED)
-        IF ( .NOT. OPENED ) OPEN (MDS(3),FILE=FNMPRE(:J)//TFILE(:IFT), ERR=889, &
-             IOSTAT=IERR)
+        IF ( .NOT. OPENED ) THEN
+          OPEN (MDS(3),FILE=FNMPRE(:J)//TFILE(:IFT),IOSTAT=IERR)
+          IF (IERR.NE.0) CALL EXTOPN(NDSE,IERR,'W3INIT','TEST',2)
+        END IF
       END IF
     end if ! if (.not. logfile_is_assigned)
     !
@@ -809,9 +820,15 @@ CONTAINS
     NSEALM = NSEALMout
     call print_memcheck(memunit, 'memcheck_____:'//' WW3_INIT SECTION 2f')
 #ifdef W3_DIST
-    IF ( NSEA .LT. NAPROC ) GOTO 820
+    IF ( NSEA .LT. NAPROC ) THEN
+      IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8020) NSEA, NAPROC
+      CALL EXTCDE ( 820 )
+    END IF
     IF (LPDLIB .eqv. .FALSE.) THEN
-      IF ( NSPEC .LT. NAPROC ) GOTO 821
+      IF ( NSPEC .LT. NAPROC ) THEN
+        IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8021) NSPEC, NAPROC
+        CALL EXTCDE ( 821 )
+      END IF
     END IF
 #endif
 
@@ -954,7 +971,10 @@ CONTAINS
 #ifdef W3_DIST
     IF (LPDLIB .eqv. .FALSE.) THEN
       DO ISP=1, NSPEC
-        IF ( IAPPRO(ISP) .EQ. -1. ) GOTO 829
+        IF ( IAPPRO(ISP) .EQ. -1. ) THEN
+          IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8029)
+          CALL EXTCDE ( 829 )
+        END IF
       END DO
     END IF
 #endif
@@ -966,38 +986,29 @@ CONTAINS
     VA(:,:) = 0.
 #ifdef W3_PIO
     if (use_restartnc) then
-      if (runtype == 'continue' )then
-        call set_user_timestring(time,user_timestring)
+      call set_user_timestring(time,user_timestring)
+      if (restart_from_binary) then
+        fname = trim(user_restfname)//trim(user_timestring)
+      else
+        fname = trim(user_restfname)//trim(user_timestring)//'.nc'
+      endif
+      inquire(file=trim(fname), exist=exists)
+      if (exists) then
         if (restart_from_binary) then
-          fname = trim(user_restfname)//trim(user_timestring)
+          call w3iors('READ', nds(6), sig(nk), imod, filename=trim(fname))
         else
-          fname = trim(user_restfname)//trim(user_timestring)//'.nc'
-        endif
-        inquire(file=trim(fname), exist=exists)
-        if (exists) then
-          if (restart_from_binary) then
-            call w3iors('READ', nds(6), sig(nk), imod, filename=trim(fname))
-          else
-            call read_restart(trim(fname), va=va, mapsta=mapsta, mapst2=mapst2)
-          end if
-        else
-          call extcde (60, msg="required restart file " // trim(fname) // " does not exist")
+          call read_restart(trim(fname), va=va, mapsta=mapsta, mapst2=mapst2)
         end if
       else
-        if (restart_from_binary) then
-          call set_user_timestring(time,user_timestring)
-          fname = trim(user_restfname)//trim(user_timestring)
-          inquire(file=trim(fname), exist=exists)
-          if (exists) then
-            call w3iors('READ', nds(6), sig(nk), imod, filename=trim(fname))
-          else
-            call extcde (60, msg="required restart file " // trim(fname) // " does not exist")
-          end if
-        else
+        if (runtype == 'continue') then
+          call extcde (60, msg="required restart file " // trim(fname) // " does not exist")
+        elseif (restart_from_binary) then 
+          call extcde (60, msg="required restart file " // trim(fname) // " does not exist")
+        else 
           call read_restart('none')
-          ! mapst2 is module variable defined in read of mod_def; maptst is from 2.b above
-          flcold = .true.
-        end if
+         ! mapst2 is module variable defined in read of mod_def; maptst is from 2.b above
+         flcold = .true.
+        endif 
       end if
     else
 #endif
@@ -1583,32 +1594,6 @@ CONTAINS
 #endif
     RETURN
     !
-    ! Escape locations read errors :
-    !
-#ifdef W3_DIST
-820 CONTINUE
-    IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8020) NSEA, NAPROC
-    CALL EXTCDE ( 820 )
-    !
-821 CONTINUE
-    IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8021) NSPEC, NAPROC
-    CALL EXTCDE ( 821 )
-    !
-829 CONTINUE
-    IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8029)
-    CALL EXTCDE ( 829 )
-#endif
-
-    !
-888 CONTINUE
-    IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8000) IERR
-    CALL EXTCDE ( 1 )
-    !
-889 CONTINUE
-    ! === no process number filtering for test file !!! ===
-    WRITE (NDSE,8001) IERR
-    CALL EXTCDE ( 2 )
-    !
     ! Formats
     !
 900 FORMAT ( ' WAVEWATCH III log file            ',             &
@@ -1668,12 +1653,6 @@ CONTAINS
 987 FORMAT (/' Coupling output fields : '/                           &
          '--------------------------------------------------')
     !
-8000 FORMAT (/' *** WAVEWATCH III ERROR IN W3INIT : '/               &
-         '     ERROR IN OPENING LOG FILE'/                           &
-         '     IOSTAT =',I5/)
-8001 FORMAT (/' *** WAVEWATCH III ERROR IN W3INIT : '/               &
-         '     ERROR IN OPENING TEST FILE'/                          &
-         '     IOSTAT =',I5/)
 8002 FORMAT (/' *** WAVEWATCH III WARNING IN W3INIT : '/             &
          '     SIGNIFICANT PART OF RESOURCES RESERVED FOR',          &
          ' OUTPUT :',F6.1,'%'/)
@@ -1849,7 +1828,7 @@ CONTAINS
     USE W3ODATMD, ONLY: NDST, NAPROC, IAPROC
     !/
 #ifdef W3_MPI
-    INCLUDE "mpif.h"
+    use mpi_f08
 #endif
     !/
     !/ ------------------------------------------------------------------- /
@@ -2228,7 +2207,7 @@ CONTAINS
     use w3odatmd, only : restart_from_binary, use_restartnc, use_historync
     !/
 #ifdef W3_MPI
-    INCLUDE "mpif.h"
+    use mpi_f08
 #endif
     !/
     !/ ------------------------------------------------------------------- /
@@ -5566,7 +5545,7 @@ CONTAINS
 #endif
     !/
 #ifdef W3_MPI
-    INCLUDE "mpif.h"
+    use mpi_f08
 #endif
     !/
     !/ ------------------------------------------------------------------- /

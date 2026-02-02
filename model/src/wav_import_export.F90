@@ -45,7 +45,7 @@ module wav_import_export
   end interface FillGlobalInput
 
   type fld_list_type                               !< @private a structure for the list of fields
-    character(len=128) :: stdname                  !< a standard field name
+    character(len=80) :: stdname                  !< a standard field name
     integer :: ungridded_lbound = 0                !< the ungridded dimension lower bound
     integer :: ungridded_ubound = 0                !< the ugridded dimension upper bound
   end type fld_list_type
@@ -284,6 +284,11 @@ contains
     use w3wdatmd    , only: w3setw
 #ifdef W3_CESMCOUPLED
     use w3idatmd    , only: HSL
+#else
+    use wav_shr_mod , only : casename
+#ifdef W3_MPI
+    use wmmdatmd    , only: mpi_comm_grd
+#endif
 #endif
 
     ! input/output variables
@@ -300,6 +305,8 @@ contains
     real(r4)                :: def_value
     character(len=10)       :: uwnd
     character(len=10)       :: vwnd
+    integer                 :: isea
+    real(r4), parameter     :: fillv = 9.99e20
     real(r4), allocatable   :: wxdata(:)      ! only needed if merge_import
     real(r4), allocatable   :: wydata(:)      ! only needed if merge_import
     character(len=*), parameter :: subname='(wav_import_export:import_fields)'
@@ -358,6 +365,14 @@ contains
       if (state_fldchk(importState, 'So_u')) then
         call SetGlobalInput(importState, 'So_u', vm, global_data, rc)
         if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+        if(trim(casename) == 'ufs.hafs') then
+          do isea = 1,nsea
+            if(abs(global_data(isea)-fillv).lt.0.01) then
+              global_data(isea)=0.0
+            end if
+          end do
+        end if
         call FillGlobalInput(global_data, CX0)
       end if
 
@@ -366,6 +381,13 @@ contains
       if (state_fldchk(importState, 'So_v')) then
         call SetGlobalInput(importState, 'So_v', vm, global_data, rc)
         if (ChkErr(rc,__LINE__,u_FILE_u)) return
+        if(trim(casename) == 'ufs.hafs') then
+          do isea = 1,nsea
+            if(abs(global_data(isea)-fillv).lt.0.01) then
+              global_data(isea)=0.0
+            end if
+          end do
+        end if
         call FillGlobalInput(global_data, CY0)
       end if
     end if

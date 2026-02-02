@@ -52,6 +52,10 @@ module wav_comp_nuopc
 #ifndef W3_CESMCOUPLED
   use shr_is_restart_fh_mod , only : init_is_restart_fh, is_restart_fh, is_restart_fh_type
 #endif
+  use mpi_f08
+#ifdef UFS_TRACING
+  use ufs_trace_mod
+#endif
 
   implicit none
   private ! except
@@ -64,8 +68,6 @@ module wav_comp_nuopc
   private :: ModelSetRunClock
   private :: ModelAdvance
   private :: ModelFinalize
-
-  include "mpif.h"
 
   !--------------------------------------------------------------------------
   ! Private module data
@@ -96,6 +98,7 @@ module wav_comp_nuopc
   character(*), parameter :: u_FILE_u = &                  !< a character string for an ESMF log message
        __FILE__
 
+  integer :: mype = -1
   !===============================================================================
 contains
   !===============================================================================
@@ -112,9 +115,20 @@ contains
     integer, intent(out) :: rc
 
     character(len=*),parameter  :: subname=trim(modName)//':(SetServices) '
+    type(ESMF_VM)                 :: vm
 
     rc = ESMF_SUCCESS
     call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
+
+    call ESMF_GridCompGet(gcomp, vm=vm,rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_VMGet(vm, localpet=mype, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace_init()
+    if (mype == 0) call ufs_trace("wave", "SetServices", "B")
+#endif
 
     ! the NUOPC gcomp component will register the generic methods
     call NUOPC_CompDerive(gcomp, model_routine_SS, rc=rc)
@@ -156,6 +170,9 @@ contains
 
     call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
 
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "SetServices", "E")
+#endif
   end subroutine SetServices
 
   !===============================================================================
@@ -180,12 +197,18 @@ contains
     !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "InitializeP0", "B")
+#endif
 
     ! Switch to IPDv01 by filtering all other phaseMap entries
 
     call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, acceptStringList=(/"IPDv01p"/), rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "InitializeP0", "E")
+#endif
   end subroutine InitializeP0
 
   !===============================================================================
@@ -250,7 +273,8 @@ contains
     integer                     :: petcount
     integer                     :: mds(15) ! Note that nds is set to this in w3initmod
     integer                     :: ntrace(2)
-    integer                     :: iam, mpi_comm, num_threads
+    integer                     :: iam, num_threads
+    type(MPI_COMM)              :: mpicomm
     real(r8)                    :: toff
     logical                     :: isPresent, isSet
     character(23)               :: dtme21
@@ -263,6 +287,9 @@ contains
     character(len=*), parameter :: subname=trim(modName)//':(InitializeAdvertise) '
     !-------------------------------------------------------------------------------
 
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "InitializeAdvertise", "B")
+#endif
     call ufs_settimer(wtime)
     rc = ESMF_SUCCESS
     call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
@@ -439,7 +466,7 @@ contains
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call ESMF_VMGet(vm, mpiCommunicator=mpi_comm, peCount=petcount, localPet=iam, rc=rc)
+    call ESMF_VMGet(vm, mpiCommunicator=mpicomm%mpi_val, peCount=petcount, localPet=iam, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_InfoGetFromHost(gcomp, info=info, rc=rc)
@@ -644,7 +671,7 @@ contains
     end if
 
     if (use_restartnc .or. use_historync) then
-      call wav_pio_init(gcomp, mpi_comm, stdout, naproc/num_threads, rc)
+      call wav_pio_init(gcomp, mpicomm%mpi_val, stdout, naproc/num_threads, rc)
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
@@ -654,15 +681,15 @@ contains
 
     time = time0
 #ifndef W3_CESMCOUPLED
-    call waveinit_ufs(gcomp, stdout, ntrace, mpi_comm, mds, rc)
+    call waveinit_ufs(gcomp, stdout, ntrace, mpicomm, mds, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 #else
     call ESMF_ClockGet( clock, timeStep=timeStep, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call waveinit_cesm(gcomp, ntrace, mpi_comm, mds, rc)
+    call waveinit_cesm(gcomp, ntrace, mpicomm, mds, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 #endif
-    !call mpi_barrier ( mpi_comm, ierr )
+    !call mpi_barrier ( mpicomm, ierr )
     if ( root_task ) then
       inquire(unit=stdout, name=logfile)
       write(*,'(a)')'WW3 log written to '//trim(logfile)
@@ -691,6 +718,10 @@ contains
     if (root_task) call ufs_logtimer(nu_timer,time0,start_tod,'InitializeAdvertise time: ',runtimelog,wtime)
 
     call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
+
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "InitializeAdvertise", "E")
+#endif
 
   end subroutine InitializeAdvertise
   !========================================================================
@@ -760,6 +791,10 @@ contains
 
     rc = ESMF_SUCCESS
     if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
+
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "InitializeRealize", "B")
+#endif
 
     call ufs_settimer(wtime)
 
@@ -934,6 +969,9 @@ contains
 
     if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
 
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "InitializeRealize", "E")
+#endif
   end subroutine InitializeRealize
 
   !===============================================================================
@@ -971,6 +1009,9 @@ contains
 
     rc = ESMF_SUCCESS
     if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "DataInitialize", "B")
+#endif
 
     call NUOPC_ModelGet(gcomp, exportState=exportState, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -1024,6 +1065,9 @@ contains
 
     if (dbug_flag > 5) call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
 
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "DataInitialize", "E")
+#endif
   end subroutine DataInitialize
 
   !=====================================================================
@@ -1072,6 +1116,9 @@ contains
 
     rc = ESMF_SUCCESS
     if (dbug_flag  > 5) call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "ModelAdvance", "B")
+#endif
 
     !------------
     ! query the Component for its importState, exportState and clock
@@ -1182,6 +1229,9 @@ contains
     if (root_task) call ufs_logtimer(nu_timer,time,tod,'ModelAdvance time: ',runtimelog,wtime)
     call ufs_settimer(wtime)
 
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "ModelAdvance", "E")
+#endif
   end subroutine ModelAdvance
 
   !===============================================================================
@@ -1228,6 +1278,9 @@ contains
 
     rc = ESMF_SUCCESS
     call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "ModelSetRunClock", "B")
+#endif
 
     ! query the Component for its clocks
     call NUOPC_ModelGet(gcomp, driverClock=dclock, modelClock=mclock, rc=rc)
@@ -1376,6 +1429,9 @@ contains
 
     call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
 
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "ModelSetRunClock", "E")
+#endif
   end subroutine ModelSetRunClock
 
   !===============================================================================
@@ -1400,6 +1456,9 @@ contains
 
     rc = ESMF_SUCCESS
     call ESMF_LogWrite(trim(subname)//' called', ESMF_LOGMSG_INFO)
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "ModelFinalize", "B")
+#endif
 
     if ( root_task ) then
       write(nds(1),F91)
@@ -1410,6 +1469,9 @@ contains
     call ESMF_LogWrite(trim(subname)//' done', ESMF_LOGMSG_INFO)
     if(root_task) call ufs_logtimer(nu_timer,timen,tod,'ModelFinalize time: ',runtimelog,wtime)
 
+#ifdef UFS_TRACING
+    if (mype == 0) call ufs_trace("wave", "ModelFinalize", "E")
+#endif
   end subroutine ModelFinalize
 
   !===============================================================================
@@ -1420,13 +1482,13 @@ contains
   !!
   !! @param[in]    gcomp        an ESMF_GridComp object
   !! @param[in]    ntrace       unit numbers for trace
-  !! @param[in]    mpi_comm     an mpi communicator
+  !! @param[in]    mpicomm     an mpi communicator
   !! @param[in]    mds          unit numbers
   !! @param[out]   rc           return code
   !!
   !> @author mvertens@ucar.edu, Denise.Worthen@noaa.gov
   !> @date 01-05-2022
-  subroutine waveinit_cesm(gcomp, ntrace, mpi_comm, mds, rc)
+  subroutine waveinit_cesm(gcomp, ntrace, mpicomm, mds, rc)
 
     ! Initialize ww3 for cesm (called from InitializeRealize)
 
@@ -1444,7 +1506,7 @@ contains
     ! input/output variables
     type(ESMF_GridComp)   :: gcomp
     integer , intent(in)  :: ntrace(:)
-    integer , intent(in)  :: mpi_comm
+    type(MPI_COMM) , intent(in)  :: mpicomm
     integer , intent(in)  :: mds(:)
     integer , intent(out) :: rc
 
@@ -1498,35 +1560,35 @@ contains
     end if
 
     ! ESMF does not have a broadcast for chars
-    call mpi_bcast(initfile, len(initfile), MPI_CHARACTER, 0, mpi_comm, ierr)
+    call mpi_bcast(initfile, len(initfile), MPI_CHARACTER, 0, mpicomm, ierr)
     if (ierr /= MPI_SUCCESS) then
       call ESMF_LogWrite(trim(subname)//' error in mpi broadcast for initfile ', &
            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
       rc = ESMF_FAILURE
       return
     end if
-    call mpi_bcast(dtcfl, 1, MPI_INTEGER, 0, mpi_comm, ierr)
+    call mpi_bcast(dtcfl, 1, MPI_INTEGER, 0, mpicomm, ierr)
     if (ierr /= MPI_SUCCESS) then
       call ESMF_LogWrite(trim(subname)//' error in mpi broadcast for dtcfl ',&
            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
       rc = ESMF_FAILURE
       return
     end if
-    call mpi_bcast(dtcfli, 1, MPI_INTEGER, 0, mpi_comm, ierr)
+    call mpi_bcast(dtcfli, 1, MPI_INTEGER, 0, mpicomm, ierr)
     if (ierr /= MPI_SUCCESS) then
       call ESMF_LogWrite(trim(subname)//' error in mpi broadcast for dtcfli ',&
            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
       rc = ESMF_FAILURE
       return
     end if
-    call mpi_bcast(dtmax, 1, MPI_INTEGER, 0, mpi_comm, ierr)
+    call mpi_bcast(dtmax, 1, MPI_INTEGER, 0, mpicomm, ierr)
     if (ierr /= MPI_SUCCESS) then
       call ESMF_LogWrite(trim(subname)//' error in mpi broadcast for dtmax ',&
            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
       rc = ESMF_FAILURE
       return
     end if
-    call mpi_bcast(dtmin, 1, MPI_INTEGER, 0, mpi_comm, ierr)
+    call mpi_bcast(dtmin, 1, MPI_INTEGER, 0, mpicomm, ierr)
     if (ierr /= MPI_SUCCESS) then
       call ESMF_LogWrite(trim(subname)//' error in mpi broadcast for dtmax ',&
            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
@@ -1540,7 +1602,7 @@ contains
 
     ! Read the namelist settings in ww3_shel.nml
     call ESMF_LogWrite(trim(subname)//' call read_shel_config', ESMF_LOGMSG_INFO)
-    call read_shel_config(mpi_comm, mds, time0_overwrite=time0, timen_overwrite=timen)
+    call read_shel_config(mpicomm, mds, time0_overwrite=time0, timen_overwrite=timen)
 
     ! NOTE:  that wavice_coupling must be set BEFORE the call to advertise_fields
     ! So the current mechanism is to force the inflags1(-7) and inflags1(-3) be set to true
@@ -1578,7 +1640,7 @@ contains
 
     call ESMF_LogWrite(trim(subname)//' call w3init', ESMF_LOGMSG_INFO)
     call w3init ( 1, .false., 'ww3', mds, ntrace, odat, flgrd, flgr2, flgd, flg2, &
-         npts, x, y, pnames, iprt, prtfrm, mpi_comm )
+         npts, x, y, pnames, iprt, prtfrm, mpicomm )
 
     ! NOTE: these need to be set again AFTER w3init is run - since these values will be overwritten
     ! by the read of mod_def.ww3
@@ -1599,13 +1661,13 @@ contains
   !! @param[in]    gcomp        an ESMF_GridComp object
   !! @param[in]    stdout       the logfile unit on the root task
   !! @param[in]    ntrace       unit numbers for trace
-  !! @param[in]    mpi_comm     an mpi communicator
+  !! @param[in]    mpicomm     an mpi communicator
   !! @param[in]    mds          unit numbers
   !! @param[out]   rc           return code
   !!
   !> @author mvertens@ucar.edu, Denise.Worthen@noaa.gov
   !> @date 01-05-2022
-  subroutine waveinit_ufs( gcomp, stdout, ntrace, mpi_comm, mds, rc)
+  subroutine waveinit_ufs( gcomp, stdout, ntrace, mpicomm, mds, rc)
 
     ! Initialize ww3 for ufs (called from InitializeRealize)
 
@@ -1621,7 +1683,7 @@ contains
     type(ESMF_GridComp)  :: gcomp
     integer, intent(in)  :: stdout
     integer, intent(in)  :: ntrace(:)
-    integer, intent(in)  :: mpi_comm
+    type(MPI_COMM), intent(in)  :: mpicomm
     integer, intent(in)  :: mds(:)
     integer, intent(out) :: rc
 
@@ -1641,7 +1703,7 @@ contains
 
     fnmpre = './'
     if (root_task) write(stdout,'(a)') trim(subname)//' call read_shel_config'
-    call read_shel_config(mpi_comm, mds, time0_overwrite=time0, timen_overwrite=timen, rstfldlist=fldrst)
+    call read_shel_config(mpicomm, mds, time0_overwrite=time0, timen_overwrite=timen, rstfldlist=fldrst)
 
     ! Define any additional restart fields
     if(len_trim(fldrst) > 0) then
@@ -1655,7 +1717,7 @@ contains
 
     if (root_task) write(stdout,'(a,/)') trim(subname)//' call w3init'
     call w3init ( 1, .false., 'ww3', mds, ntrace, odat, flgrd, flgr2, flgd, flg2, &
-         npts, x, y, pnames, iprt, prtfrm, mpi_comm )
+         npts, x, y, pnames, iprt, prtfrm, mpicomm )
 
     write(cvalue,'(4f10.1)')dtmax,dtcfl,dtcfli,dtmin
     write(logmsg,'(a)')trim(subname)//': WW3 timesteps from mod_def '//trim(cvalue)

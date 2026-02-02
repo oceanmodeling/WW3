@@ -115,6 +115,8 @@ set(netcdf_programs ww3_ounf ww3_ounp ww3_bounc ww3_trnc ww3_prnc)
 if("OASIS" IN_LIST switches)
   find_package(OASIS REQUIRED)
   target_link_libraries(ww3_lib PUBLIC OASIS::OASIS)
+  find_package(MPI REQUIRED COMPONENTS Fortran)
+  target_link_libraries(ww3_lib PUBLIC MPI::MPI_Fortran)
 endif()
 
 if(NETCDF)
@@ -138,7 +140,7 @@ endif()
 
 if(UFS_CAP)
   # Don't search for ESMF if target already exists (when build WW3 as UFS submodule)
-  if (NOT TARGET esmf)
+  if (NOT TARGET ESMF::ESMF)
     find_package(ESMF MODULE REQUIRED)
   endif()
 
@@ -149,7 +151,10 @@ if(UFS_CAP)
   endif()
 
   target_sources(ww3_lib PRIVATE ${cap_src})
-  target_link_libraries(ww3_lib PUBLIC esmf)
+  target_link_libraries(ww3_lib PUBLIC ESMF::ESMF)
+  if(UFS_TRACING)
+    target_link_libraries(ww3_lib PUBLIC ufs_tracing)
+  endif()
   # Don't build executables when building WW3 ESMF library
   if (NOT BUILD_TOOLS)
     set(programs "")
@@ -165,11 +170,6 @@ set_property(SOURCE w3initmd.F90
 if("OMPG" IN_LIST switches)
   find_package(OpenMP REQUIRED COMPONENTS Fortran)
   target_link_libraries(ww3_lib PUBLIC OpenMP::OpenMP_Fortran)
-endif()
-
-if("MPI" IN_LIST switches)
-  find_package(MPI REQUIRED COMPONENTS Fortran)
-  target_link_libraries(ww3_lib PUBLIC MPI::MPI_Fortran)
 endif()
 
 if("PIO" IN_LIST switches)
@@ -188,7 +188,7 @@ if("PDLIB" IN_LIST switches)
       list(APPEND compile_flags_release -DSCOTCH_707)
       list(APPEND compile_flags_debug -DSCOTCH_707)
     else()
-      message(STATUS "SOCTCH version 7.06 or lower")
+      message(STATUS "SCOTCH version 7.06 or lower")
     endif()
   elseif("METIS"  IN_LIST switches)
     find_package(ParMETIS REQUIRED)
@@ -197,6 +197,11 @@ if("PDLIB" IN_LIST switches)
   else()
     message(FATAL_ERROR "PDLIB requires METIS or SCOTCH library for domain decomposition")
   endif()
+endif()
+
+if("MPI" IN_LIST switches)
+  find_package(MPI REQUIRED COMPONENTS Fortran)
+  target_link_libraries(ww3_lib PUBLIC MPI::MPI_Fortran)
 endif()
 
 if("SCRIP" IN_LIST switches)
@@ -230,9 +235,17 @@ foreach(program ${programs})
   target_link_libraries(${program} PRIVATE ww3_lib)
 endforeach()
 
-target_compile_options(ww3_lib PUBLIC "$<$<COMPILE_LANGUAGE:Fortran>:${compile_flags}>")
-target_compile_options(ww3_lib PUBLIC "$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:Fortran>>:${compile_flags_debug}>")
-target_compile_options(ww3_lib PUBLIC "$<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:Fortran>>:${compile_flags_release}>")
+if (UFS_CAP)
+  # Building as part of UFS (submodule)
+  set(WW3_FLAG_SCOPE PRIVATE)
+else()
+  # Standalone WW3 build
+  set(WW3_FLAG_SCOPE PUBLIC)
+endif()
+
+target_compile_options(ww3_lib ${WW3_FLAG_SCOPE} "$<$<COMPILE_LANGUAGE:Fortran>:${compile_flags}>")
+target_compile_options(ww3_lib ${WW3_FLAG_SCOPE} "$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:Fortran>>:${compile_flags_debug}>")
+target_compile_options(ww3_lib ${WW3_FLAG_SCOPE} "$<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:Fortran>>:${compile_flags_release}>")
 
 install(
   TARGETS ${programs} ww3_lib
